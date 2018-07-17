@@ -1,0 +1,6 @@
+execute:
+	@gfortran -O3 -o prog_solve_ch.exe mymod.f90 vproutines.f90 prog_solve_ch.f90 -lfftw3 -framework Accelerate
+	@./prog_solve_ch.exe | tee prog_solve_ch.log
+
+clean:
+	@rm -f *.o

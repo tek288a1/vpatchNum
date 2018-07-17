@@ -1,0 +1,1047 @@
+% Created 2018-03-07 Wed 13:42
+% Intended LaTeX compiler: pdflatex
+\documentclass[11pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{graphicx}
+\usepackage{grffile}
+\usepackage{longtable}
+\usepackage{wrapfig}
+\usepackage{rotating}
+\usepackage[normalem]{ulem}
+\usepackage{amsmath}
+\usepackage{textcomp}
+\usepackage{amssymb}
+\usepackage{capt-of}
+\usepackage{hyperref}
+\usepackage{minted}
+\author{Tae Eun Kim}
+\date{\today}
+\title{2-D vortex patch fortran 90 program}
+\hypersetup{
+ pdfauthor={Tae Eun Kim},
+ pdftitle={2-D vortex patch fortran 90 program},
+ pdfkeywords={},
+ pdfsubject={},
+ pdfcreator={Emacs 25.3.1 (Org mode 9.1.6)},
+ pdflang={English}}
+\begin{document}
+
+\maketitle
+\tableofcontents
+
+\section{Todo's}
+\label{sec:org5b38cc3}
+\begin{itemize}
+\item[{$\boxtimes$}] Useful general modules
+\begin{itemize}
+\item[{$\boxtimes$}] constants: pi, i, e, line(---\ldots{}), \ldots{}
+\item[{$\boxtimes$}] function(vnorm) 1-norm / 2-norm / \sout{infinity-norm}
+\item[{$\boxtimes$}] subroutines: linspace (a+(b-a)*i/n, i=0,n) and linspace1 (a+(b-a)*i/n, i=0,n-1)
+\item[{$\boxtimes$}] subroutines: timestamp
+\end{itemize}
+\item[{$\boxtimes$}] subroutines and functions
+\begin{itemize}
+\item[{$\boxtimes$}] reading and writing data
+\item[{$\boxtimes$}] point evaluation
+\item[{$\boxtimes$}] velocity (integration) - new version with efficient alternating point quadrature
+\item[{$\boxtimes$}] residual (as a function)
+\item[{$\boxtimes$}] vsolver -  newton continuation
+\item[{$\boxtimes$}] c\(_{\text{0}}\) calculation
+\item[{$\boxtimes$}] transfer matrix M calculation - efficient version using fft
+\item[{$\boxtimes$}] j(nu) calculation
+\end{itemize}
+\item[{$\boxtimes$}] newton continuation method
+\begin{itemize}
+\item[{$\boxtimes$}] LINPACK
+\item[{$\boxtimes$}] LAPACK
+\item[{$\boxtimes$}] save solution
+\end{itemize}
+\item[{$\boxminus$}] fft
+\begin{itemize}
+\item[{$\boxtimes$}] Using fftw
+\item[{$\boxtimes$}] double Fourier series: two 1-D FFT \& one 2-D FFT
+\item[{$\square$}] FFT based on shifted ponits
+\item[{$\square$}] Self-contained code? Is it possible?
+\end{itemize}
+\item[{$\boxtimes$}] Is it possible to compile files in subdirectory and to save
+binary files in a subdirectory? - see below
+\item[{$\square$}] Find out why coefficients have discrepancy (\textasciitilde{}1e-12) between matlab and fortran
+\item[{$\square$}] plotting using gnuplot
+\end{itemize}
+\section{Directory organization}
+\label{sec:org6d95a01}
+\subsection{Project directory}
+\label{sec:org46af9f0}
+\begin{minted}[]{shell}
+tree -d ../
+\end{minted}
+
+\subsection{{\bfseries\sffamily ☛ TODO} More specialized and cleaner structure}
+\label{sec:org0e31fc4}
+See if I can clean it up more using functionalities of \texttt{make}.
+\begin{verbatim}
+../
+├── data
+├── doc
+├── src
+├── bin
+├── obj
+└── fig
+
+6 directories
+\end{verbatim}
+\section{Program organization}
+\label{sec:org028dfb7}
+\subsection{Modules}
+\label{sec:org04d2a7d}
+\textbf{ISSUE.} When tangled, emacs automatically wraps the module file with \texttt{program main} and \texttt{end program main}, which need to be deleted manually.
+\subsubsection{Constants}
+\label{sec:org5e7249f}
+\begin{itemize}
+\item set real kind (single or double precition)
+\item pi, i, eps
+\end{itemize}
+\subsubsection{Basic routines - printing, linspace, etc}
+\label{sec:orga952248}
+\begin{itemize}
+\item\relax [SR] writing complex data
+\item\relax [FN] linspace, linspace1, linspaceh
+\item\relax [FN] identity matrix, zero array constructor
+\item\relax [FN] vector infinity-norm calculator
+\item\relax [FN] generating data filename
+\item\relax [SR] time stamp
+\item\relax [FN] matrix infinity-norm calculator
+\item\relax [SR] generating data filename
+\end{itemize}
+\subsubsection{Notes:}
+\label{sec:orgad8991a}
+\begin{itemize}
+\item When a function defined externally outside the main program, it appears that gfortran compiler wants to have an \texttt{interface} block. In case a function defined in a module is called, it works fine without \texttt{interface} block.
+\end{itemize}
+\subsection{Main program}
+\label{sec:org715b463}
+\subsubsection{solver program}
+\label{sec:org6e7e368}
+\subsubsection{transfer matrix calculation}
+\label{sec:org664a940}
+\subsubsection{fft program}
+\label{sec:orga40ca8c}
+\subsubsection{calculation of bounds}
+\label{sec:orgf1a23b1}
+\subsubsection{testing program}
+\label{sec:orgcc15a15}
+\subsection{Subroutines and functions}
+\label{sec:orgf899ab8}
+\subsubsection{Reading data}
+\label{sec:org1f5f3da}
+\subsubsection{Writing data}
+\label{sec:orgaa61298}
+\subsubsection{Point evaluation}
+\label{sec:org59c08b9}
+\subsubsection{Velocity calculation}
+\label{sec:org4d5ae3b}
+\subsubsection{Residual calculation}
+\label{sec:org17ab98d}
+\subsubsection{Vortex patch solver (Newton continuation)}
+\label{sec:org5ec0355}
+\subsubsection{FFT and \$T\$-matrix calculation}
+\label{sec:org15010ea}
+\section{Data file structure}
+\label{sec:org18b491a}
+\subsection{Naming convention}
+\label{sec:orgec1d30d}
+\texttt{vp\_bI\_nEE\_rDDDD.dat} where
+\begin{itemize}
+\item \texttt{bI} describes how \(\beta\) value was obtained:
+I = 0 : \(\beta = 0\)
+I = 1 : \(\beta = (1 - \sqrt{1-\rho^2})/\rho\)
+I = 2 : \(\beta = (1 - 2\sqrt{1-\rho^2})/\rho\)
+\item \texttt{nEE} indicates that \(n = 2^{\rm EE}\).
+\item \texttt{rDDDD} represents the value of \(\rho = 0.{\rm DDDD}\).
+\end{itemize}
+\subsection{Example}
+\label{sec:org83e5060}
+An example data file \texttt{vp\_b0\_n07\_r5000.dat} may look like
+\begin{center}
+\begin{tabular}{rrl}
+line & file & note\\
+\hline
+1 & 128 & n\\
+2 & 0.5000 & rho\\
+3 & 0.0000 & beta\\
+4 & 2.7814117251577763\,(-01) & U\\
+5 & 2.3675575948962696\,(-01) & a\(_{\text{1}}\)\\
+6 & -6.6992137885540828\,(-02) & a\(_{\text{2}}\)\\
+\vdots & \vdots & \vdots\\
+131 & 2.8142318944085296\,(-20) & a\(_{\text{n-1}}\)\\
+\end{tabular}
+\end{center}
+
+Our \texttt{data} directory looks like this:
+\begin{minted}[]{shell}
+tree ../data
+\end{minted}
+
+Here is one of the actual data file:
+\begin{minted}[]{shell}
+cat ../data/vp_b0_n07_r1000.dat
+\end{minted}
+
+\section{LINPACK}
+\label{sec:org04b268f}
+\subsection{Useful subroutines: double precision}
+\label{sec:org8da3aed}
+\begin{itemize}
+\item DGECO: calculates condition number
+\item DGEDI: calculates determinant
+\item DGESL: solves A*X = B
+\end{itemize}
+\subsection{Example}
+\label{sec:org6eb6ca4}
+\begin{minted}[]{fortran}
+integer :: n                  ! order of matrix A = JAC
+integer :: lda = n            ! leading dimension of A
+integer :: ipvt(n)            ! pivot indices
+integer :: job = 0
+real(rk) :: rcond
+real(rk) :: z(n)
+real(rk) :: jac(n,n)
+!
+! linear algebra routines (LINPACK) ----------------------------
+!
+call DGECO(jac, lda, n, ipvt, rcond, z)
+! LU-factors JAC and estimates RCOND;
+! JAC, on return, provides L and U
+! IPVT is the pivot indices;
+! Z is a work vector;
+call DGESL(jac, n, n, ipvt, res, job)
+! Solves JAC*X = RES; on return, RES is the solution;
+! JOB = 0 for non-transposed problem
+\end{minted}
+\subsection{Notes}
+\label{sec:orgb0a6848}
+\begin{itemize}
+\item When using Burkardt's \texttt{linpack\_d.f90}, make sure to link \texttt{lapack}
+as it is not self-contained.
+\begin{verbatim}
+gfortran -o main.exe main.f90 linpack_d.f90 -framework Accelerate
+\end{verbatim}
+\item However, the quadruple precision library \texttt{linpack\_q.f90} is
+self-contained:
+\begin{verbatim}
+gfortran -o main.exe main.f90 linpack_q.f90
+\end{verbatim}
+\item When using \texttt{linpack}, compile with either
+\begin{itemize}
+\item \href{file:///Users/tae/Dropbox/src/linpack.f}{linpack.f} (Fortran77)
+\item \href{file:///Users/tae/Dropbox/src/linpack\_d.f90}{linpack\(_{\text{d.f90}}\)} (Fortran90) with \texttt{-framework Accelerate} flag.
+\end{itemize}
+Even if the main program follows Fortran90 standards, \texttt{linpack.f}
+works seamlessly.
+\item \textbf{Update} The source files \texttt{linpack*} are simply collection of
+routines (dependencies) required for \texttt{DGECO}, \texttt{DGEDI}, and
+\texttt{DGESL}. Some of them are again dependent on some routines of
+\texttt{blas} library. The required routines are identified and combined
+into a single source file for both \texttt{linpack} and \texttt{lapack}.
+\end{itemize}
+
+\section{LAPACK (modern)}
+\label{sec:orgebc566e}
+\subsection{Using LAPACK in Mac}
+\label{sec:orgeed60b3}
+Mac supplies a copy of LAPACK compiled and optimized for Apple hardwares
+and it is easily available as a library. In order to link/load the
+library, include \texttt{-framework Accelerate} compilation flag, e.g.,
+\begin{minted}[]{shell}
+gfortran -o myprog.exe myprog.f90 -framework Accelerate
+\end{minted}
+
+The library is located in the system directory \href{file:///System/Library/Frameworks/Accelerate.framework/}{/System/Library/Framework}.
+
+\subsection{Useful subroutines and their usage}
+\label{sec:orgf3d08d5}
+Let \(A \in \mathbb{R}^{n \times n}\).
+\begin{itemize}
+\item DGETRF: LU-factorization of \(A\)
+\item DGECON: calculates condition number of \(A\)
+\item DGETRI: calculates the inverse \(A^{-1}\) using LU-decomposition
+\item DGETRS: solves \(A x = b\) via Gaussian elimination, i.e. LU-factorization
+\end{itemize}
+
+\begin{minted}[]{fortran}
+integer :: m                  ! number of rows
+integer :: n                  ! number of columns
+real(8) :: a(lda,n)           ! matrix A; on exit, factors L and U
+integer :: lda                ! leading dimension of A
+integer :: ipiv(n)            ! ivot indices, dimension = min(m,n)
+integer :: info               ! 0 for successful exit
+call dgetrf(m, n, a, lda, ipiv, info)
+\end{minted}
+
+\begin{minted}[]{fortran}
+character*1 :: norm            ! '1' for 1-norm; 'I' for infinity-norm
+integer :: n                   ! order of matrix
+real(8) :: a(lda,n)            ! matrix/array A
+integer :: lda                 ! leading dimension of A
+real(8) :: anorm               ! 1-norm or infinity-norm of A; it is an input
+real(8) :: rcond               ! rcond  = 1/(norm(A)norm(A^{-1}))
+real(8) :: work(4*n)           ! double array
+integer :: iwork(n)            ! integer array
+integer :: info                ! 0 for successful exit
+call dgecon(norm, n, a, lda, anorm, rcond, work, iwork, info)
+\end{minted}
+
+\begin{minted}[]{fortran}
+character*1 :: trans        ! form of the S.O.E.; 'N' for no transpose
+integer :: n                ! order of matrix A
+integer :: nrhs             ! number of right-hand side
+real(8) :: a(lda,n)         ! matrix A
+integer :: lda              ! leading dimension of A
+integer :: ipiv(n)          ! pivot indices
+real(8) :: b(ldb,nrhs)      ! right-hand side; on exit, returns the solution X
+integer :: ldb              ! leading dimension of A
+integer :: info             ! 0 for successful exit
+call dgetrs(trans, n, nrhs, a, lda, ipiv, b, ldb, info)
+\end{minted}
+\begin{itemize}
+\item \textbf{Note.} One of the inputs, \texttt{anorm}, for \texttt{dgecon} must be calculated
+before calling the routine. A function calculating matrix
+infinity-norm has been included in my module, currently named as
+\texttt{mnorm}.
+\end{itemize}
+
+\subsection{Example snippet}
+\label{sec:org0669f4f}
+
+\begin{minted}[]{fortran}
+! for lapack routines
+integer :: n
+integer :: lda = n
+integer :: ldb = n
+integer :: lwork = 4*n
+integer :: info
+integer :: ipiv(n)
+integer :: iwork(n)
+real(rk) :: anorm
+real(rk) :: rcond
+real(rk) :: work(lwork)
+
+! linear algebra routines (LAPACK) -------------------------------
+anorm = mnorm(n, n, jac)   ! matrix infinity-norm
+! calculating infinity norm of matrix JAC
+call DGETRF(n, n, jac, lda, ipiv, info)
+call DGECON('O', n, jac, lda, anorm, rcond, work, iwork, info)
+call DGETRS('N', n, 1, jac, lda, ipiv, res, ldb, info)
+\end{minted}
+
+\section{FFTW}
+\label{sec:orgbf523ec}
+\subsection{Installation and basic usage}
+\label{sec:org4ab39c8}
+On Mac, I used \texttt{homebrew}
+\begin{minted}[]{shell}
+brew install fftw
+\end{minted}
+
+The files \texttt{libfftw3xxx.a} are saved in \href{file:///usr/local/lib/}{/usr/local/lib} directory. At link time, use \texttt{-l} flag as follows:
+\begin{minted}[]{shell}
+gfortran -o myprog.exe myprog.f90 -lfftw3
+\end{minted}
+
+The program file \texttt{myprog.f90} should contain a line
+\begin{minted}[]{fortran}
+include "fftw3.f90"
+\end{minted}
+which declares variables used.
+
+On my linux machine running ArchLinux, I installed it using \texttt{packer}:
+\begin{minted}[]{shell}
+packer fftw fftw-quad
+\end{minted}
+
+\subsection{Variable declaration}
+\label{sec:org77138c2}
+The file \texttt{fftw3.f90} declares variables needed for execution of \texttt{fftw} routines:
+\begin{minted}[]{shell}
+cat ../src/fftw3.f90
+\end{minted}
+
+\subsection{Forward and backward 1-D (complex) DFT routines}
+\label{sec:org82f6eeb}
+The \textbf{forward DFT} of 1-D complex array \(X\) of size \(n\) calculates an
+array \(Y\) of the same dimension where
+\[
+Y_k = \sum_{j=0}^{n-1} X_j e^{-2\pi i j k / n} \,.
+\]
+
+The \textbf{backward DFT} computes
+\[
+Y_k = \sum_{j=0}^{n-1} X_j e^{2\pi i j k / n} \,.
+\]
+
+Note that \texttt{fftw} computes unnormalized transforms. So Fourier series
+coefficients can be approximated using the forward DFT with \(1/n\). The
+inverse discrete Fourier transform is numerically calculated with the
+backward DFT without any normalization.
+
+Note also that an output of the forward DFT are ordered so that the
+first half of the output corresponds to the positive modes while the
+second half to the negative ones in backwards order; this is due to
+the \$n\$-periodicity of \(Y_k\) in its index.
+
+\textbf{Example.} When \(n = 8\), we have the following correspondence between indices (\(k\)), mode numbers, and Fortran indices:
+
+\begin{center}
+\begin{tabular}{rrr}
+k & mode & fortran\\
+\hline
+0 & 0 & 1\\
+1 & 1 & 2\\
+2 & 2 & 3\\
+3 & 3 & 4\\
+4 & Nyquist & 5\\
+5 & -3 & 6\\
+6 & -2 & 7\\
+7 & -1 & 8\\
+\end{tabular}
+\end{center}
+
+In general:
+\begin{center}
+\begin{tabular}{lll}
+k & mode & fortran\\
+\hline
+0 & 0 & 1\\
+1 & 1 & 2\\
+: & : & :\\
+n/2-1 & n/2-1 & n/2\\
+n/2 & Nyquist & n/2+1\\
+n/2+1 & -n/2+1 & n/2+2\\
+: & : & :\\
+n-1 & -1 & n\\
+\end{tabular}
+\end{center}
+
+\textbf{Snippet.}
+\begin{minted}[]{fortran}
+  implicit none
+  include "fftw3.f90"
+  integer ( kind = 4 ), parameter :: n = 100
+
+  complex ( kind = 8 ) in(n)
+  complex ( kind = 8 ) in2(n)
+  complex ( kind = 8 ) out(n)
+  integer ( kind = 8 ) plan_backward
+  integer ( kind = 8 ) plan_forward
+!
+!  Make a plan for the FFT, and forward transform the data.
+!
+  call dfftw_plan_dft_1d_ ( plan_forward, n, in, out, FFTW_FORWARD, FFTW_ESTIMATE )
+  call dfftw_execute_ ( plan_forward )
+  out = out/real(n, kind=8)     ! normalization
+!
+!  Make a plan for the backward FFT, and recover the original data.
+!
+  call dfftw_plan_dft_1d_ ( plan_backward, n, out, in2, FFTW_BACKWARD, FFTW_ESTIMATE )
+  call dfftw_execute_ ( plan_backward )
+  print *, maxval(abs(in-in2))  ! compare the recovered data against the original
+!
+!  Discard the information associated with the plans.
+!
+  call dfftw_destroy_plan_ ( plan_forward )
+  call dfftw_destroy_plan_ ( plan_backward )
+\end{minted}
+
+\subsection{Forward and backward 2-D (complex) DFT routines}
+\label{sec:orgc22eeb7}
+The \textbf{forward DFT} of \(n \times n\) 2-D complex array \(X\) calculates an
+array \(Y \in \mathbb{C}^{n \times n}\) where
+\[
+Y_{j,k} = \sum_{m=0}^{n-1} \sum_{l=0}^{n-1} X_{l,m} e^{-2\pi i (jl+km)/n} \,.
+\]
+
+The \textbf{backward DFT} computes
+\[
+Y_{j,k} = \sum_{m=0}^{n-1} \sum_{l=0}^{n-1} X_{l,m} e^{2\pi i (jl+km)/n} \,.
+\]
+
+Note that these are simply the separable product of 1-D transforms
+along each dimension of the array \(X\), that is, along the columns and
+rows of \(X\).
+
+Once again, \texttt{fftw} computes unnormalized transforms and so double
+Fourier series coefficients can be approximated using the forward DFT
+with \(1/n^2\). The inverse discrete Fourier transform is numerically
+calculated with the backward DFT without any normalization.
+
+\textbf{Snippet}
+\begin{minted}[]{fortran}
+implicit none
+include "fftw3.f90"
+integer ( kind = 4 ), parameter :: n = 100
+integer ( kind = 4 ) :: i, j
+complex ( kind = 8 ) :: in(n)
+complex ( kind = 8 ) :: in2(n,n)
+complex ( kind = 8 ) :: out(n)
+complex ( kind = 8 ) :: out2(n,n)
+complex ( kind = 8 ) :: X(n,n)
+complex ( kind = 8 ) :: Y(n,n)
+integer ( kind = 8 ) :: plan_backward
+integer ( kind = 8 ) :: plan_forward
+
+! Method 1: double 1d-fft's
+do j = 1,n                    ! along columns
+   in = X(:, j)
+   call dfftw_plan_dft_1d_ &
+        ( plan_forward, n, in, out, FFTW_FORWARD, FFTW_ESTIMATE)
+   call dfftw_execute_ ( plan_forward )
+    X(:, j) = out/real(n, rk)
+end do
+do i = 1,n                    ! then along rows
+   in = X(i, :)
+   call dfftw_plan_dft_1d_ &
+        ( plan_forward, n, in, out, FFTW_FORWARD, FFTW_ESTIMATE)
+   call dfftw_execute_ ( plan_forward )
+   Y(i, :) = out/real(n, rk)
+end do
+call dfftw_destroy_plan_ ( plan_forward )
+
+! Method 2: 2d-fft
+in2 = X
+call dfftw_plan_dft_2d_ ( plan_forward, n, n, in2, out2, FFTW_FORWARD, &
+     FFTW_ESTIMATE)
+call dfftw_execute_ ( plan_forward )
+Y = out2/real(n**2, rk)
+call dfftw_destroy_plan_ ( plan_forward )
+\end{minted}
+
+\subsection{Shifted FFT}
+\label{sec:org9971c98}
+Using the approximating nature of DFT on physical data against the coefficients of Fourier expansion, we may utilize FFT routines on data obtained on half-step shifted grids on \([0, 2\pi)\).
+
+For the sake of illustration, consider the 1-D FFT situation where \(X^{(s)} \in \mathbb{C}^{N}\) is a vector of point values at \(2\pi(j+1/2)/N\) for \(0 \le j < N\) and \(Y^{(s)}\) is the result of the forward FFT on \(X^{(s)}\), i.e.,
+\[
+Y^{(s)}_j = \frac{1}{N} \sum_{k=0}^{N-1} X^{(s)}_k e^{-2 \pi i j k /N} \,.
+\]
+
+By adjusting the phase of complex exponentials, we can interpret them in term of approximate Fourier coefficients of the underlying function for the \(X^{(s)}\) data. Keeping in mind the aliasing errors associated with the discrete Fourier transforms, i.e., the \$N\$-periodicity over the index \(j\), we observe that
+
+\begin{itemize}
+\item For \(0 \le j < N/2\),
+\[
+   Y^{(s)}_j \approx Y_j e^{- i j/N} \,,
+   \]
+\item For \(N/2 < j < N\),
+\[
+   Y^{(s)}_j \approx Y_j e^{- i (j-N)/N} \,,
+   \]
+\end{itemize}
+
+The second case was considered with
+\section{Compiling with \texttt{gfortran}}
+\label{sec:orgb0feddd}
+\section{Makefile}
+\label{sec:org3302c69}
+\subsection{Editing a make file in Emacs/Org-mode}
+\label{sec:org1f125b7}
+\begin{itemize}
+\item When a \texttt{make} source code written in org-mode src block is tangled,
+tabs are converted to spaces. One can manually \texttt{M-x tabify} the
+entire file.
+\item A makefile whose file name is not \texttt{Makefile} will not be in \texttt{makefile-mode} automatically. Set the mode by \texttt{M-x makefile-mode}.
+\item In order to run a makefile with filename other than \texttt{Makefile}, use \texttt{make -f filename}.
+\end{itemize}
+
+\subsection{Some idea from StackOverflow}
+\label{sec:orgff454f0}
+From \href{https://stackoverflow.com/questions/8855896/specify-directory-where-gfortran-should-look-for-modules}{Specify directory where gfortran should look for modules}
+
+\begin{verbatim}
+You can tell gfortran where your module files (.mod files) are located with the -I compiler flag. In addition, you can tell the compiler where to put compiled modules with the -J compiler flag. See the section "Options for directory search" in the gfortran man page.
+
+I use these to place both my object (.o files) and my module files in the same directory, but in a different directory to all my source files, so I don't clutter up my source directory. For example,
+
+SRC = /path/to/project/src
+OBJ = /path/to/project/obj
+BIN = /path/to/project/bin
+
+gfortran -J$(OBJ) -c $(SRC)/bar.f90 -o $(OBJ)/bar.o
+gfortran -I$(OBJ) -c $(SRC)/foo.f90 -o $(OBJ)/foo.o
+gfortran -o $(BIN)/foo.exe $(OBJ)/foo.o $(OBJ)/bar.o
+While the above looks like a lot of effort to type out on the command line, I generally use this idea in my makefiles.
+
+Just for reference, the equivalent Intel fortran compiler flags are -I and -module. Essentially ifort replaces the -J option with -module. Note that there is a space after module, but not after J.
+\end{verbatim}
+
+\section{Fortran 90 programming tips}
+\label{sec:org8a43dbf}
+\subsection{Notes on precision in fortran90+}
+\label{sec:orgbb99309}
+At the beginning of program, set real precision, which is of integer type, to be
+\begin{itemize}
+\item 4 : single
+\item 8 : double
+\item 16 : quadruple
+\end{itemize}
+For example, declare
+\begin{minted}[]{fortran}
+integer, parameter :: rp = 16
+\end{minted}
+
+Then the precision of a real or complex variable can be declared by:
+\begin{minted}[]{fortran}
+real(kind=rp) :: x
+complex(kind=rp) :: z
+\end{minted}
+or simply by
+\begin{minted}[]{fortran}
+real(rp) :: x
+complex(rp) :: z
+\end{minted}
+
+In the body of program, the precision of a floating point number can be set by suffixing with the precision parameter, e.g.
+\begin{itemize}
+\item 1.0\(_{\text{4}}\) : single, same as 1.0
+\item 1.0\(_{\text{8}}\) : double, same as 1.d0
+\item 1.0\(_{\text{16}}\) : quadruple
+\end{itemize}
+Once the precision is stored in the variable, say  \texttt{rp}, one can simply write \texttt{1.0\_rp}.
+
+The precision of outputs of an intrinsic function is determined by that of its input(s). This way, we can avoid using old \texttt{d}-variations, e.g., \texttt{dcos}, \texttt{dsin}, \texttt{dabs}, etc.
+
+A complex number of certain precision can be constructed using \texttt{cmplx} function with the following syntax:
+\begin{minted}[]{fortran}
+z = cmplx( x, y, rp )
+\end{minted}
+
+\subsection{Nice tips on using \texttt{read} and \texttt{write} functions}
+\label{sec:org014bb6d}
+
+The following is an example of using \texttt{write} function to assimilate the functionality of \texttt{MatLab}'s \texttt{sprintf}.
+
+\begin{minted}[]{fortran}
+program play
+  implicit none
+  integer :: m
+  real(8) :: rho
+
+  interface
+     function genfilename(n, rho, betaopt)
+       integer, intent(in) :: n
+       real(8), intent(in) :: rho
+       integer, intent(in) :: betaopt
+     end function genfilename
+  end interface
+
+end program play
+
+function genfilename(n, rho, betaopt)
+  implicit none
+  ! declaring arguments
+  integer, intent(in) :: n
+  real(8), intent(in) :: rho
+  integer, intent(in) :: betaopt
+  ! output
+  character(len=28) :: genfilename
+  ! local variables
+  character(len=*), parameter :: fmt = trim('(a, i1, a, i0.2, a, i0.4, a)')
+  integer :: log2n
+  log2n = int(log(real(n))/log(real(2)))
+  write( genfilename, fmt ) &
+       '../data/vp_b', betaopt, '_n', log2n, '_r', int(1000*rho), '.dat'
+end function genfilename
+\end{minted}
+
+\subsection{\texttt{linspaceh} function:}
+\label{sec:orgf4426f7}
+The function \texttt{linspaceh(a, b, h)} constructs a vector of uniformly spaced-out points between \texttt{a} and \texttt{b} with gap \texttt{h}. In case \texttt{b-a} is not a (numerical) multiple of \texttt{h}, then the gap between \texttt{b} and the one before will be smaller than \texttt{h}. This function is included in \href{file:///Users/tae/Google\%20Drive/VP\_fortran/src/mymod.f90}{mymod.f90}.
+
+\begin{minted}[]{fortran}
+program main
+  implicit none
+  real(8) :: rho0
+  real(8) :: rho1
+  real(8) :: drho
+  real(8), dimension(:), allocatable :: rhodpt
+  integer :: i
+
+  interface
+     function linspaceh(a, b, h)
+       real(8), intent(in) :: a, b, h
+       real(8), dimension(:), allocatable :: linspaceh
+     end function linspaceh
+  end interface
+  rho0 = 0.1D0
+  rho1 = 0.53D0
+  drho = 0.05D0
+  rhodpt = linspaceh(rho0, rho1, drho)
+  do i = 1, size(rhodpt)
+     write(*, '(i3, 2x, f6.4)') i, rhodpt(i)
+  end do
+  print *, rhodpt, "hello world"
+  deallocate (rhodpt)
+end program main
+
+function linspaceh(a, b, h)
+  implicit none
+  real(8), intent(in) :: a, b, h
+  real(8), parameter :: eps = epsilon(1.d0)
+  integer :: i, n
+  real(8), dimension(:), allocatable :: linspaceh
+  n = int((b-a)/h)
+  ! if (abs((b-a)/h-n)<eps) then  -----------> it doesn't work
+  ! if ( abs( (b-a)-n*h ) < eps ) then ------> this works
+  if ( abs(mod(b-a, h)) < eps ) then ! note we compare against the
+     ! machine epsilo n
+     allocate(linspaceh(n+1))
+     linspaceh = (/ (a + h*i, i=0,n) /)
+  else
+     allocate(linspaceh(n+2))
+     linspaceh = (/ (a+h*i, i=0,n), b /) ! note how a vector and a
+                                         ! number are concatenated
+  end if
+end function linspaceh
+\end{minted}
+
+\subsection{I/O formatting}
+\label{sec:org9cdbc28}
+\subsubsection{\texttt{print}}
+\label{sec:orgbc969e9}
+Printing out to terminal: \texttt{print format\_specifier, i/o\_list},
+e.g. \texttt{print *, 'hello world'}
+\subsubsection{\texttt{write}}
+\label{sec:org98ef15c}
+\begin{minted}[]{fortran}
+implicit none
+real(8) :: pi = acos(-1.0d0)
+integer :: n = 256
+write(*, '( i30   )') n          ! integer
+write(*, *) pi                   ! free format
+write(*, '( f30.16)') pi         ! decimal
+write(*, '( g30.16)') pi         ! whichever is nice
+write(*, '( e30.16)') pi         ! exponential notation
+write(*, '(es30.16)') pi         ! scientific notation
+write(*, '(en30.16)') pi         ! engineering notation
+write(*, '( e30.16E3)') pi       ! exponential notation, more spaces for exponents
+write(*, '(2e30.16)') pi, 2*pi   ! concatenation of two
+\end{minted}
+
+\subsection{Arrays - basics}
+\label{sec:org36ec673}
+\begin{itemize}
+\item In Fortran 90+, one can construct arrays with inline do-loops, a.k.a., implied do-loops. For example,
+\begin{minted}[]{fortran}
+v = (/ (i, i=1,10) /)
+w = [ (j, j=1,100,2) ]
+\end{minted}
+
+\item Of course, \texttt{i} and \texttt{j} need to be declared integers and \texttt{v} and \texttt{w}
+as integer/real/complex arrays of appropriate dimensions. Note
+below how types are cast:
+\begin{minted}[]{fortran}
+program arrays
+  implicit none
+  integer, parameter :: m=2, n=5
+  integer :: i
+  integer :: v_int(n), inner, outer(n,n)
+  real :: v_real(n), a(m,n), a1(m,n), b(n,m), b1(n,m), c(m,m), d(n,n)
+  complex :: v_cmplx(n)
+
+  ! constructing vectors using inline do-loops
+  v_int = [ (i, i = 1,n) ]
+  v_real = [ (i, i = 1,n) ]
+  v_cmplx = [ (cmplx(i, sqrt(real(i))), i = 1,n) ]
+
+  ! type-casting
+  do i = 1,n
+     print *, v_int(i), v_real(i), v_cmplx(i)
+  end do
+
+  ! 2-D array using do-loop
+  do i = 1,n
+     a(1:m,i) = (/ i, i+1 /)
+  end do
+
+  ! 2-D array using reshape and implied do-loop
+  a1 = reshape( [(i, i=1,m*n)], [m,n] )
+
+  ! transpose
+  b = transpose(a)
+
+  ! reshaping
+  b1 = reshape( a1, [n,m] )
+
+  ! scalar multiplication, inner product, outer product
+  v_int = 2*v_int               ! scalar multiplication
+  inner = dot_product(v_int, v_int) ! inner product
+  outer = spread(v_int, 2, n)*spread(v_int, 1, n)
+  ! spread behaves like MatLab's repmat function
+
+  print *, ''
+  do i = 1,n
+     print *, v_int(i)
+  end do
+end program arrays
+\end{minted}
+
+\item \texttt{size} and \texttt{shape}
+\end{itemize}
+\subsection{Arrays - assignment}
+\label{sec:org7b8765f}
+Many functions on arrays behave similarly to those of \texttt{MatLa}.
+
+\begin{minted}[]{fortran}
+implicit none
+integer, parameter :: n = 5
+integer, parameter :: rk = 8
+integer :: i
+real(rk) :: v(n), w(n), A(n,n)
+
+A = 0.0_rk                    ! creating zero matrix
+write(*, '(a)') 'Creating zero matrix'
+write(*, '(a/)') 'A = 0.0_rk  yields '
+write(*, '(5f8.4)') A
+
+v = (/ (i, i=1,n) /)
+w = (/ (i, i=n,1,-1) /)
+write(*, '(/a)') 'Defining vectors'
+write(*, '(5f8.4)') v
+write(*, '(5f8.4)') w
+
+write(*, '(/a)') 'Assigning columns of A:'
+do i = 1,n
+   A(:,i) = v**i
+end do
+do i = 1,n
+   write(*, '(5g12.4)') A(i, :)
+end do
+\end{minted}
+
+\subsection{Arrays: \texttt{transpose} and \texttt{spread}}
+\label{sec:org2ace33d}
+\begin{minted}[]{fortran}
+implicit none
+integer, parameter :: n = 5
+integer, parameter :: rk = 8
+integer :: i
+real(rk) :: v(n), w(n), A(n,n), B(n,n)
+
+v = (/ (i, i=1,n) /)
+w = (/ (i, i=n,1,-1) /)
+write(*, '(/a)') 'Defining vectors'
+write(*, '(5f8.4)') v
+write(*, '(5f8.4)') w
+
+write(*, '(/a)') 'spread: equivalent of repmat in matlab'
+write(*, '(a)') '   syntax: spread( array, dim, ncopies )'
+A = spread(v, 1, n)
+B = spread(v, 2, n)
+
+write(*, '(/a)') '  A = '
+do i = 1,n
+   write(*, '(5g12.4)') A(i, :)
+end do
+
+write(*, '(/a)') '  B = '
+do i = 1,n
+   write(*, '(5g12.4)') B(i, :)
+end do
+
+B = transpose(A)
+write(*, '(/a)') 'Transpose of a matrix'
+write(*, '(a)') '    syntax: transpose( array )'
+write(*, '(/a)') '  A transpoe = '
+do i = 1,n
+   write(*, '(5g12.4)') B(i, :)
+end do
+\end{minted}
+
+\subsection{Arrays: general concatenation using \texttt{reshape}}
+\label{sec:org198c7d8}
+\begin{minted}[]{fortran}
+implicit none
+integer, parameter :: n = 5
+integer, parameter :: rk = 8
+integer :: i
+real(rk) :: v(n), w(n), A(n,n), B(n,n), C(2*n,n), D(n,2*n)
+
+v = (/ (i, i=1,n) /)
+w = (/ (i, i=n,1,-1) /)
+
+A =  reshape((/ (v**i, i=1,n) /), [n,n])
+write(*, '(/a)') 'Concatenation using reshape function'
+do i = 1,n
+   write(*, '(5g12.4)') A(i, :)
+end do
+
+B =  transpose(reshape((/ (v**i, i=1,n) /), [n,n]))
+write(*, '(/a)') 'Concatenation using reshape function'
+do i = 1,n
+   write(*, '(5g12.4)') B(i, :)
+end do
+
+C(1:n, :) = A
+C(n+1:2*n, :) = B(n:1:-1, :)
+write(*, '(/a)') 'Concatenating two matrices'
+do i = 1,2*n
+   write(*, '(5g12.4)') C(i, :)
+end do
+\end{minted}
+
+\subsection{Arrays: trick to calculate maximal value of an array using \texttt{reshape}}
+\label{sec:orgc1f2cdc}
+\begin{minted}[]{fortran}
+implicit none
+real(8) :: a(3,3)
+
+a(1,1) = 1.0D+00
+a(1,2) = 2.0D+00
+a(1,3) = 3.0D+00
+
+a(2,1) = 4.0D+00
+a(2,2) = 5.0D+00
+a(2,3) = 6.0D+00
+
+a(3,1) = 7.0D+00
+a(3,2) = 8.0D+00
+a(3,3) = 0.0D+00
+
+print *, maxval( reshape(a, [size(a)]) ) ! turn a into a vector
+! the 2nd arg of reshape should be an array of rank 1
+\end{minted}
+
+\subsection{Characters}
+\label{sec:org2db8d92}
+\subsubsection{Example}
+\label{sec:orgbbc7a5a}
+\begin{minted}[]{fortran}
+program character
+  implicit none
+  character(len=30) :: fname
+
+  fname = 'mydata.dat'
+  print *, fname
+  stop
+end program character
+\end{minted}
+\subsubsection{Notes}
+\label{sec:orgbc35629}
+\begin{itemize}
+\item Use \texttt{character(len=*)} when the length of a character string is not known.
+\end{itemize}
+\subsection{Important notes on \texttt{interface}}
+\label{sec:orgf599c6c}
+When one intends to input an array of arbitrary size into a routine, the \emph{assumed shape} technique turns out to be quite advantageous. Consider the following sample program:
+
+\begin{minted}[]{fortran}
+program dummy_array
+  implicit none
+  integer, dimension(10) :: a
+  interface ! This interface block is necessary
+     subroutine fill_array(a)
+       integer, dimension(:), intent(out) :: a
+     end subroutine fill_array
+  end interface
+  call fill_array(a)
+  write(*, '(i4)') a
+end program dummy_array
+
+subroutine fill_array(a)
+  implicit none
+  ! argument declaration
+  integer, dimension(:), intent(out) :: a
+  ! local variable
+  integer :: i, size_a
+  size_a = size(a)
+  do i = 1,size_a
+     a(i) = i
+  end do
+end subroutine fill_array
+\end{minted}
+
+Note that the \texttt{interface} block is required. In the block, only the arguments to the routines need be type-cast.
+
+In order to avoid writing such blocks over and over, utilize a module structure as follows:
+\begin{minted}[]{fortran}
+module mod
+contains
+  subroutine fill_array(a)
+    implicit none
+    ! argument declaration
+    integer, dimension(:), intent(out) :: a
+    ! local variable
+    integer :: i, size_a
+    size_a = size(a)
+    do i = 1,size_a
+       a(i) = i
+    end do
+  end subroutine fill_array
+end module mod
+
+program dummy_array
+  use mod
+  implicit none
+  integer, dimension(10) :: a
+  call fill_array(a)
+  write(*, '(i4)') a
+end program dummy_array
+\end{minted}
+
+\section{Testing area}
+\label{sec:org311825d}
+\begin{minted}[]{fortran}
+implicit none
+! argument declaration
+integer, parameter :: n = 512
+integer, parameter :: rk = 8
+integer :: i, j, k
+real(8) :: rho = 0.5d0
+real(8) :: beta = 0.d0
+real(8) :: pi = 4.d0*atan(1.d0)
+real(8) :: M(n,n)
+real(8) :: nu(n)
+complex(8) :: eta(n), zeta(n), etah(n), integ(n,n), etahm(n,n)
+
+nu = (/ (2*pi*i/n, i=0,n-1) /)
+eta = exp( cmplx(0.0, 1.0, kind=8) * nu )
+zeta = (eta-beta)/(1.0_rk-beta*eta)
+etah = (rho**2/zeta+beta)/(1.0_rk+beta*(rho**2/zeta))
+! write (*, '(2es25.10)') etah
+
+integ = cmplx(spread(eta, 1, n) ** spread((/ (k-1, k=1,n) /), 2, n), kind=rk)
+etahM = spread(etah, 1, n)
+do j = 1,n
+   integ = cmplx(integ*etahM, kind=rk)
+   M(:,j) = 1/real(n, rk)*real(sum(integ, 2), rk)
+end do
+do i = 1,1
+   do j = n-4,n
+      ! write(*, '(2x, i4, 2x, i4, 2x, es16.5e3)') i, j, M(i,j)
+      write(*, '(2x, i4, 2x, i4, 2x, e16.5E3)') i, j, M(i,j)
+   end do
+end do
+\end{minted}
+
+\begin{minted}[]{fortran}
+implicit none
+real(8) :: a(3,3), b(3)
+integer :: i
+
+a(1,1) = 1.0D+00
+a(1,2) = 2.0D+00
+a(1,3) = 3.0D+00
+
+a(2,1) = 4.0D+00
+a(2,2) = 5.0D+00
+a(2,3) = 6.0D+00
+
+a(3,1) = 7.0D+00
+a(3,2) = 8.0D+00
+a(3,3) = 0.0D+00
+
+b = (/ 1.d0, 2.d0, 3.d0 /)
+print *, size(a)
+print *, reshape(a, (/9/))
+\end{minted}
+\end{document}

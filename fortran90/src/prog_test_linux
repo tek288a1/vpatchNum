@@ -1,0 +1,6 @@
+execute:
+	@gfortran -O3 -o prog_test.exe mymod.f90 vproutines.f90 prog_test.f90 -lfftw3 -llapack
+	@./prog_test.exe | tee prog_test.log
+
+clean:
+	@rm -f *.o

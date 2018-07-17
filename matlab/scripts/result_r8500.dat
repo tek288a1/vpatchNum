@@ -1,0 +1,24 @@
+rho           0.85
+beta          0.56
+n_coeff        255  
+n_fft         1024  
+
+f0p_inf      28.81
+f0p_h0       10.25
+f0p_h1       25.97
+f0m           0.44
+q1m           2.68
+q0_inf        1.02
+q0_h1         0.80
+q0tn_h1       0.52
+r0tn_inf  6.82e-13
+r0tn_h1   5.59e-12
+K_inf         1.98
+K_1           0.71
+K_2           1.22
+beta1         0.74
+beta2         2.70
+beta3         4.54
+beta4       150.68
+beta5        54.11
+beta6      1571.72

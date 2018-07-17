@@ -1,0 +1,10 @@
+ 2 March 2018   8:28:36.615 AM
+   0.0000000000000000     
+
+norm difference of positive modes: a data vs. fft data
+ 1.13096E-17
+
+norm difference of nonpositive modes: fft vs transfer matrix
+ 1.09094E-17
+
+ 2 March 2018   8:28:36.674 AM

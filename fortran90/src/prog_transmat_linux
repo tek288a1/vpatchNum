@@ -1,0 +1,6 @@
+execute:
+	@gfortran -O3 -o prog_transmat.exe mymod.f90 vproutines.f90 prog_transmat.f90 -lfftw3 -llapack
+	@./prog_transmat.exe | tee prog_transmat.log
+
+clean:
+	@rm -f *.o

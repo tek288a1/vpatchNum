@@ -1,0 +1,1493 @@
+#+TITLE: 2-D vortex patch fortran 90 program
+#+AUTHOR: Tae Eun Kim
+#+STARTUP: indent
+* Todo's
+ - [X] Useful general modules
+   - [X] constants: pi, i, e, line(---...), ...
+   - [X] function(vnorm) 1-norm / 2-norm / +infinity-norm+
+   - [X] subroutines: linspace (a+(b-a)*i/n, i=0,n) and linspace1 (a+(b-a)*i/n, i=0,n-1)
+   - [X] subroutines: timestamp
+ - [X] subroutines and functions
+   - [X] reading and writing data
+   - [X] point evaluation
+   - [X] velocity (integration) - new version with efficient alternating point quadrature
+   - [X] residual (as a function)
+   - [X] vsolver -  newton continuation
+   - [X] c_0 calculation
+   - [X] transfer matrix M calculation - efficient version using fft
+   - [X] j(nu) calculation
+ - [X] newton continuation method
+   - [X] LINPACK
+   - [X] LAPACK
+   - [X] save solution
+ - [-] fft
+   - [X] Using fftw
+   - [X] double Fourier series: two 1-D FFT & one 2-D FFT
+   - [ ] FFT based on shifted ponits
+   - [ ] Self-contained code? Is it possible?
+ - [X] Is it possible to compile files in subdirectory and to save
+   binary files in a subdirectory? - see below
+ - [ ] Find out why coefficients have discrepancy (~1e-12) between matlab and fortran
+ - [ ] plotting using gnuplot
+* Directory organization
+** Project directory
+#+BEGIN_SRC shell :results verbatim
+  tree -d ../
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+../
+├── data
+├── doc
+├── src
+├── test
+│   ├── fftpack
+│   ├── fftw
+│   ├── gnufor
+│   └── linpack
+└── tmp
+
+11 directories
+#+end_example
+
+** ☛ TODO More specialized and cleaner structure
+See if I can clean it up more using functionalities of =make=.
+#+begin_example
+../
+├── data
+├── doc
+├── src
+├── bin
+├── obj
+└── fig
+
+6 directories
+#+end_example
+* Program organization
+** Modules
+*ISSUE.* When tangled, emacs automatically wraps the module file with =program main= and =end program main=, which need to be deleted manually.
+*** Constants
+ - set real kind (single or double precition)
+ - pi, i, eps
+*** Basic routines - printing, linspace, etc
+ - [SR] writing complex data
+ - [FN] linspace, linspace1, linspaceh
+ - [FN] identity matrix, zero array constructor
+ - [FN] vector infinity-norm calculator
+ - [FN] generating data filename
+ - [SR] time stamp
+ - [FN] matrix infinity-norm calculator
+ - [SR] generating data filename
+*** Notes:
+ - When a function defined externally outside the main program, it appears that gfortran compiler wants to have an =interface= block. In case a function defined in a module is called, it works fine without =interface= block.
+** Main program
+*** solver program
+*** transfer matrix calculation
+*** fft program
+*** calculation of bounds
+*** testing program
+** Subroutines and functions
+*** Reading data
+*** Writing data
+*** Point evaluation
+*** Velocity calculation
+*** Residual calculation
+*** Vortex patch solver (Newton continuation)
+*** FFT and $T$-matrix calculation
+* Data file structure
+** Naming convention
+=vp_bI_nEE_rDDDD.dat= where
+ - =bI= describes how $\beta$ value was obtained:
+   I = 0 : $\beta = 0$
+   I = 1 : $\beta = (1 - \sqrt{1-\rho^2})/\rho$
+   I = 2 : $\beta = (1 - 2\sqrt{1-\rho^2})/\rho$
+ - =nEE= indicates that $n = 2^{\rm EE}$.
+ - =rDDDD= represents the value of $\rho = 0.{\rm DDDD}$.
+** Example
+An example data file =vp_b0_n07_r5000.dat= may look like
+  |   line |                    file | note    |
+  |--------+-------------------------+---------|
+  |      1 |                     128 | n       |
+  |      2 |                  0.5000 | rho     |
+  |      3 |                  0.0000 | beta    |
+  |      4 |  2.7814117251577763E-01 | U       |
+  |      5 |  2.3675575948962696E-01 | a_1     |
+  |      6 | -6.6992137885540828E-02 | a_2     |
+  | \vdots |                  \vdots | \vdots  |
+  |    131 |  2.8142318944085296E-20 | a_{n-1} |
+
+Our =data= directory looks like this:
+#+BEGIN_SRC shell :results verbatim
+  tree ../data
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+../data
+├── vp_b0_n02_r0500.dat
+├── vp_b0_n07_r1000.dat
+├── vp_b0_n07_r1500.dat
+├── vp_b0_n07_r2000.dat
+├── vp_b0_n07_r2500.dat
+├── vp_b0_n07_r3000.dat
+├── vp_b0_n07_r3500.dat
+├── vp_b0_n07_r4000.dat
+├── vp_b0_n07_r4500.dat
+├── vp_b0_n07_r5000.dat
+├── vp_b0_n07_r5500.dat
+├── vp_b0_n07_r6000.dat
+├── vp_b0_n07_r6500.dat
+├── vp_b0_n07_r7000.dat
+├── vp_b0_n07_r7500.dat
+├── vp_b0_n07_r8000.dat
+├── vp_b0_n07_r8500.dat
+├── vp_b0_n07_r9000.dat
+├── vp_b1_n07_r1000.dat
+├── vp_b1_n07_r1500.dat
+├── vp_b1_n07_r2000.dat
+├── vp_b1_n07_r2500.dat
+├── vp_b1_n07_r3000.dat
+├── vp_b1_n07_r3500.dat
+├── vp_b1_n07_r4000.dat
+├── vp_b1_n07_r4500.dat
+├── vp_b1_n07_r5000.dat
+├── vp_b1_n07_r5500.dat
+├── vp_b1_n07_r6000.dat
+├── vp_b1_n07_r6500.dat
+├── vp_b1_n07_r7000.dat
+├── vp_b1_n07_r7500.dat
+├── vp_b1_n07_r8000.dat
+├── vp_b1_n07_r8500.dat
+├── vp_b1_n07_r9000.dat
+├── vp_b1_n07_r9500.dat
+├── vp_b1_n08_r9550.dat
+├── vp_b1_n08_r9600.dat
+├── vp_b1_n08_r9650.dat
+├── vp_b1_n08_r9700.dat
+├── vp_b1_n08_r9750.dat
+├── vp_b1_n08_r9800.dat
+├── vp_b1_n08_r9850.dat
+├── vp_b1_n08_r9900.dat
+├── vp_b2_n09_r9900.dat
+└── vp_b2_n09_r9910.dat
+
+0 directories, 46 files
+#+end_example
+
+Here is one of the actual data file:
+#+BEGIN_SRC shell :results verbatim
+  cat ../data/vp_b0_n07_r1000.dat
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+                      128
+                   0.1000
+                   0.0000
+   1.0001985238346446E-02
+   1.9809133348409310E-03
+  -1.0000858472935735E-04
+   6.6683516336685552E-06
+  -5.0012116471127812E-07
+   4.0009370843306072E-08
+  -3.3340959588259235E-09
+   2.8577851784922028E-10
+  -2.5005545957988990E-11
+   2.2227082415510279E-12
+  -2.0004350213467846E-13
+   1.8185235725188539E-14
+  -1.6662525732789802E-15
+   1.5531656430992159E-16
+  -1.2245439461365472E-17
+  -1.5122638262141917E-18
+  -9.8581567198107532E-20
+   1.3130727372372129E-19
+   3.4424588989610574E-19
+  -5.4525318213407985E-19
+  -3.4762366271456936E-19
+  -4.2449219251226118E-19
+   6.7433792389466774E-19
+  -5.8723576038217422E-19
+   6.3156260051518001E-19
+  -4.5736539408374951E-19
+  -2.0413157867351780E-19
+   2.6165203994365787E-19
+  -2.6321805017442715E-19
+  -1.2252306377680363E-18
+   4.3836673439895043E-19
+  -8.7353383701641890E-19
+  -3.9503714914894100E-19
+  -1.0165597231921565E-18
+   8.2188536809723563E-19
+  -2.3563217767738871E-19
+   8.1362969058322308E-19
+   3.7742018718630499E-19
+   2.7736818532568190E-19
+  -8.2410121569954551E-20
+   8.9449875187272598E-20
+   7.0042414294916915E-19
+  -6.0739397844888839E-19
+   3.4066447738558499E-19
+  -2.7803860287194567E-19
+   2.1684718927630965E-19
+  -3.3987499637572566E-19
+   7.5253998427381169E-19
+   2.4534439636169446E-19
+  -4.4663158628361645E-19
+   4.3773770947642855E-19
+  -7.4162485276120595E-20
+   1.8270458196597969E-19
+   2.9537468509671182E-19
+  -3.9144196915598417E-19
+  -3.5726009853028923E-20
+  -2.6262479856436225E-19
+   2.1596016597203870E-19
+  -2.7895042547153905E-19
+   1.1028427359198636E-19
+  -1.3074013901282978E-19
+  -1.5868251511149807E-19
+   1.3831022769522467E-19
+  -3.4768664456523396E-19
+  -1.7944033382136967E-19
+  -4.9631203642767744E-19
+  -3.4692491518251528E-20
+  -8.1221686523245157E-20
+   1.9718181405189956E-19
+   8.8312009299403459E-20
+  -3.1680376135385805E-20
+   5.2870768611451540E-19
+  -4.5440769601349278E-19
+  -2.0456149358123099E-19
+   4.7430076881465150E-19
+  -4.4422465207598409E-19
+  -2.6824389263628222E-19
+   7.4607244901575860E-20
+   8.8912581622369697E-20
+  -1.4357551816073925E-19
+   7.2464552603528455E-20
+  -3.6104105556462499E-19
+   3.0214912599074517E-19
+  -4.4201213256293304E-19
+   1.3541471477657501E-19
+  -2.0534197880119409E-19
+  -6.6609158277143670E-20
+   4.7656928224585952E-19
+  -4.1967186790694660E-19
+   6.3691654710913881E-19
+  -3.2999928706794195E-19
+   8.2844764678029621E-20
+   2.1626292003838460E-19
+  -1.0632810194132693E-19
+  -1.9356025972423106E-19
+   1.8729201968063238E-20
+   1.6871041788451883E-19
+  -1.3711917905854746E-19
+  -1.8262480608640534E-19
+   2.3893677221863487E-19
+  -1.0653670767574076E-19
+   8.2644294497262993E-21
+  -2.9282308071074542E-19
+   1.3184013619315692E-19
+  -1.3237950134786646E-19
+  -2.0803799057010735E-19
+  -4.9463909462429991E-20
+   1.2377928808689879E-19
+  -1.9414852359052405E-19
+   7.2945276879031268E-20
+   1.7138673346351712E-19
+  -3.1471782140513801E-19
+   6.7141659127267712E-20
+  -2.5282639933832479E-20
+  -1.8261118809875368E-19
+  -5.7123474198186214E-20
+  -9.9190524753007495E-20
+   2.2402114607246495E-19
+  -1.4182977195492378E-19
+   7.0220645816393788E-20
+   1.0196169565679633E-19
+  -1.5659303112198508E-19
+   3.2817737058090524E-19
+  -1.0330545040433233E-19
+   1.3266175306270433E-19
+   6.0096918781203959E-20
+   2.1642791859063117E-20
+  -1.7703410770086136E-20
+#+end_example
+
+* LINPACK
+** Useful subroutines: double precision
+ - DGECO: calculates condition number
+ - DGEDI: calculates determinant
+ - DGESL: solves A*X = B
+** Example
+#+BEGIN_SRC fortran
+  integer :: n                  ! order of matrix A = JAC
+  integer :: lda = n            ! leading dimension of A
+  integer :: ipvt(n)            ! pivot indices
+  integer :: job = 0
+  real(rk) :: rcond
+  real(rk) :: z(n)
+  real(rk) :: jac(n,n)
+  !
+  ! linear algebra routines (LINPACK) ----------------------------
+  !
+  call DGECO(jac, lda, n, ipvt, rcond, z)
+  ! LU-factors JAC and estimates RCOND;
+  ! JAC, on return, provides L and U
+  ! IPVT is the pivot indices;
+  ! Z is a work vector;
+  call DGESL(jac, n, n, ipvt, res, job)
+  ! Solves JAC*X = RES; on return, RES is the solution;
+  ! JOB = 0 for non-transposed problem
+#+END_SRC
+** Notes
+ - When using Burkardt's =linpack_d.f90=, make sure to link =lapack=
+   as it is not self-contained.
+   #+BEGIN_EXAMPLE
+     gfortran -o main.exe main.f90 linpack_d.f90 -framework Accelerate
+   #+END_EXAMPLE
+ - However, the quadruple precision library =linpack_q.f90= is
+   self-contained:
+   #+BEGIN_EXAMPLE
+     gfortran -o main.exe main.f90 linpack_q.f90
+   #+END_EXAMPLE
+ - When using =linpack=, compile with either
+   - [[file:~/Dropbox/src/linpack.f][linpack.f]] (Fortran77)
+   - [[file:~/Dropbox/src/linpack_d.f90][linpack_d.f90]] (Fortran90) with =-framework Accelerate= flag.
+   Even if the main program follows Fortran90 standards, =linpack.f=
+   works seamlessly.
+ - *Update* The source files =linpack*= are simply collection of
+   routines (dependencies) required for =DGECO=, =DGEDI=, and
+   =DGESL=. Some of them are again dependent on some routines of
+   =blas= library. The required routines are identified and combined
+   into a single source file for both =linpack= and =lapack=.
+
+* LAPACK (modern)
+** Using LAPACK in Mac
+Mac supplies a copy of LAPACK compiled and optimized for Apple hardwares
+and it is easily available as a library. In order to link/load the
+library, include =-framework Accelerate= compilation flag, e.g.,
+#+BEGIN_SRC shell
+  gfortran -o myprog.exe myprog.f90 -framework Accelerate
+#+END_SRC
+
+The library is located in the system directory [[file:/System/Library/Frameworks/Accelerate.framework/][/System/Library/Framework]].
+
+** Useful subroutines and their usage
+Let $A \in \mathbb{R}^{n \times n}$.
+ - DGETRF: LU-factorization of $A$
+ - DGECON: calculates condition number of $A$
+ - DGETRI: calculates the inverse $A^{-1}$ using LU-decomposition
+ - DGETRS: solves $A x = b$ via Gaussian elimination, i.e. LU-factorization
+
+ #+BEGIN_SRC fortran
+     integer :: m                  ! number of rows
+     integer :: n                  ! number of columns
+     real(8) :: a(lda,n)           ! matrix A; on exit, factors L and U
+     integer :: lda                ! leading dimension of A
+     integer :: ipiv(n)            ! ivot indices, dimension = min(m,n)
+     integer :: info               ! 0 for successful exit
+     call dgetrf(m, n, a, lda, ipiv, info)
+ #+END_SRC
+
+ #+BEGIN_SRC fortran
+     character*1 :: norm            ! '1' for 1-norm; 'I' for infinity-norm
+     integer :: n                   ! order of matrix
+     real(8) :: a(lda,n)            ! matrix/array A
+     integer :: lda                 ! leading dimension of A
+     real(8) :: anorm               ! 1-norm or infinity-norm of A; it is an input
+     real(8) :: rcond               ! rcond  = 1/(norm(A)norm(A^{-1}))
+     real(8) :: work(4*n)           ! double array
+     integer :: iwork(n)            ! integer array
+     integer :: info                ! 0 for successful exit
+     call dgecon(norm, n, a, lda, anorm, rcond, work, iwork, info)
+ #+END_SRC
+
+ #+BEGIN_SRC fortran
+     character*1 :: trans        ! form of the S.O.E.; 'N' for no transpose
+     integer :: n                ! order of matrix A
+     integer :: nrhs             ! number of right-hand side
+     real(8) :: a(lda,n)         ! matrix A
+     integer :: lda              ! leading dimension of A
+     integer :: ipiv(n)          ! pivot indices
+     real(8) :: b(ldb,nrhs)      ! right-hand side; on exit, returns the solution X
+     integer :: ldb              ! leading dimension of A
+     integer :: info             ! 0 for successful exit
+     call dgetrs(trans, n, nrhs, a, lda, ipiv, b, ldb, info)
+ #+END_SRC
+ - *Note.* One of the inputs, =anorm=, for =dgecon= must be calculated
+   before calling the routine. A function calculating matrix
+   infinity-norm has been included in my module, currently named as
+   =mnorm=.
+
+** Example snippet
+
+#+BEGIN_SRC fortran
+    ! for lapack routines
+    integer :: n
+    integer :: lda = n
+    integer :: ldb = n
+    integer :: lwork = 4*n
+    integer :: info
+    integer :: ipiv(n)
+    integer :: iwork(n)
+    real(rk) :: anorm
+    real(rk) :: rcond
+    real(rk) :: work(lwork)
+
+    ! linear algebra routines (LAPACK) -------------------------------
+    anorm = mnorm(n, n, jac)   ! matrix infinity-norm
+    ! calculating infinity norm of matrix JAC
+    call DGETRF(n, n, jac, lda, ipiv, info)
+    call DGECON('O', n, jac, lda, anorm, rcond, work, iwork, info)
+    call DGETRS('N', n, 1, jac, lda, ipiv, res, ldb, info)
+#+END_SRC
+
+* FFTW
+** Installation and basic usage
+On Mac, I used =homebrew=
+#+BEGIN_SRC shell
+  brew install fftw
+#+END_SRC
+
+The files =libfftw3xxx.a= are saved in [[file:/usr/local/lib/][/usr/local/lib]] directory. At link time, use =-l= flag as follows:
+#+BEGIN_SRC shell
+  gfortran -o myprog.exe myprog.f90 -lfftw3
+#+END_SRC
+
+The program file =myprog.f90= should contain a line
+#+BEGIN_SRC fortran
+    include "fftw3.f90"
+#+END_SRC
+which declares variables used.
+
+On my linux machine running ArchLinux, I installed it using =packer=:
+#+BEGIN_SRC shell
+  packer fftw fftw-quad
+#+END_SRC
+
+** Variable declaration
+The file =fftw3.f90= declares variables needed for execution of =fftw= routines:
+#+BEGIN_SRC shell :results output
+  cat ../src/fftw3.f90
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+  integer ( kind = 4 ), parameter :: fftw_r2hc = 0
+  integer ( kind = 4 ), parameter :: fftw_hc2r = 1
+  integer ( kind = 4 ), parameter :: fftw_dht = 2
+  integer ( kind = 4 ), parameter :: fftw_redft00 = 3
+  integer ( kind = 4 ), parameter :: fftw_redft01 = 4
+  integer ( kind = 4 ), parameter :: fftw_redft10 = 5
+  integer ( kind = 4 ), parameter :: fftw_redft11 = 6
+  integer ( kind = 4 ), parameter :: fftw_rodft00 = 7
+  integer ( kind = 4 ), parameter :: fftw_rodft01 = 8
+  integer ( kind = 4 ), parameter :: fftw_rodft10 = 9
+  integer ( kind = 4 ), parameter :: fftw_rodft11 = 10
+  integer ( kind = 4 ), parameter :: fftw_forward = -1
+  integer ( kind = 4 ), parameter :: fftw_backward = +1
+  integer ( kind = 4 ), parameter :: fftw_measure = 0
+  integer ( kind = 4 ), parameter :: fftw_destroy_input = 1
+  integer ( kind = 4 ), parameter :: fftw_unaligned = 2
+  integer ( kind = 4 ), parameter :: fftw_conserve_memory = 4
+  integer ( kind = 4 ), parameter :: fftw_exhaustive = 8
+  integer ( kind = 4 ), parameter :: fftw_preserve_input = 16
+  integer ( kind = 4 ), parameter :: fftw_patient = 32
+  integer ( kind = 4 ), parameter :: fftw_estimate = 64
+  integer ( kind = 4 ), parameter :: fftw_estimate_patient = 128
+  integer ( kind = 4 ), parameter :: fftw_believe_pcost = 256
+  integer ( kind = 4 ), parameter :: fftw_dft_r2hc_icky = 512
+  integer ( kind = 4 ), parameter :: fftw_nonthreaded_icky = 1024
+  integer ( kind = 4 ), parameter :: fftw_no_buffering = 2048
+  integer ( kind = 4 ), parameter :: fftw_no_indirect_op = 4096
+  integer ( kind = 4 ), parameter :: fftw_allow_large_generic = 8192
+  integer ( kind = 4 ), parameter :: fftw_no_rank_splits = 16384
+  integer ( kind = 4 ), parameter :: fftw_no_vrank_splits = 32768
+  integer ( kind = 4 ), parameter :: fftw_no_vrecurse = 65536
+  integer ( kind = 4 ), parameter :: fftw_no_simd = 131072
+#+end_example
+
+** Forward and backward 1-D (complex) DFT routines
+The *forward DFT* of 1-D complex array $X$ of size $n$ calculates an
+array $Y$ of the same dimension where
+\[
+Y_k = \sum_{j=0}^{n-1} X_j e^{-2\pi i j k / n} \,.
+\]
+
+The *backward DFT* computes
+\[
+Y_k = \sum_{j=0}^{n-1} X_j e^{2\pi i j k / n} \,.
+\]
+
+Note that =fftw= computes unnormalized transforms. So Fourier series
+coefficients can be approximated using the forward DFT with $1/n$. The
+inverse discrete Fourier transform is numerically calculated with the
+backward DFT without any normalization.
+
+Note also that an output of the forward DFT are ordered so that the
+first half of the output corresponds to the positive modes while the
+second half to the negative ones in backwards order; this is due to
+the $n$-periodicity of $Y_k$ in its index.
+
+*Example.* When $n = 8$, we have the following correspondence between indices ($k$), mode numbers, and Fortran indices:
+
+    | k |    mode | fortran |
+    |---+---------+---------|
+    | 0 |       0 |       1 |
+    | 1 |       1 |       2 |
+    | 2 |       2 |       3 |
+    | 3 |       3 |       4 |
+    | 4 | Nyquist |       5 |
+    | 5 |      -3 |       6 |
+    | 6 |      -2 |       7 |
+    | 7 |      -1 |       8 |
+
+In general:
+    | k     | mode    | fortran |
+    |-------+---------+---------|
+    | 0     | 0       | 1       |
+    | 1     | 1       | 2       |
+    | :     | :       | :       |
+    | n/2-1 | n/2-1   | n/2     |
+    | n/2   | Nyquist | n/2+1   |
+    | n/2+1 | -n/2+1  | n/2+2   |
+    | :     | :       | :       |
+    | n-1   | -1      | n       |
+
+*Snippet.*
+#+BEGIN_SRC fortran
+    implicit none
+    include "fftw3.f90"
+    integer ( kind = 4 ), parameter :: n = 100
+
+    complex ( kind = 8 ) in(n)
+    complex ( kind = 8 ) in2(n)
+    complex ( kind = 8 ) out(n)
+    integer ( kind = 8 ) plan_backward
+    integer ( kind = 8 ) plan_forward
+  !
+  !  Make a plan for the FFT, and forward transform the data.
+  !
+    call dfftw_plan_dft_1d_ ( plan_forward, n, in, out, FFTW_FORWARD, FFTW_ESTIMATE )
+    call dfftw_execute_ ( plan_forward )
+    out = out/real(n, kind=8)     ! normalization
+  !
+  !  Make a plan for the backward FFT, and recover the original data.
+  !
+    call dfftw_plan_dft_1d_ ( plan_backward, n, out, in2, FFTW_BACKWARD, FFTW_ESTIMATE )
+    call dfftw_execute_ ( plan_backward )
+    print *, maxval(abs(in-in2))  ! compare the recovered data against the original
+  !
+  !  Discard the information associated with the plans.
+  !
+    call dfftw_destroy_plan_ ( plan_forward )
+    call dfftw_destroy_plan_ ( plan_backward )
+#+END_SRC
+
+** Forward and backward 2-D (complex) DFT routines
+The *forward DFT* of $n \times n$ 2-D complex array $X$ calculates an
+array $Y \in \mathbb{C}^{n \times n}$ where
+\[
+Y_{j,k} = \sum_{m=0}^{n-1} \sum_{l=0}^{n-1} X_{l,m} e^{-2\pi i (jl+km)/n} \,.
+\]
+
+The *backward DFT* computes
+\[
+Y_{j,k} = \sum_{m=0}^{n-1} \sum_{l=0}^{n-1} X_{l,m} e^{2\pi i (jl+km)/n} \,.
+\]
+
+Note that these are simply the separable product of 1-D transforms
+along each dimension of the array $X$, that is, along the columns and
+rows of $X$.
+
+Once again, =fftw= computes unnormalized transforms and so double
+Fourier series coefficients can be approximated using the forward DFT
+with $1/n^2$. The inverse discrete Fourier transform is numerically
+calculated with the backward DFT without any normalization.
+
+*Snippet*
+#+BEGIN_SRC fortran
+    implicit none
+    include "fftw3.f90"
+    integer ( kind = 4 ), parameter :: n = 100
+    integer ( kind = 4 ) :: i, j
+    complex ( kind = 8 ) :: in(n)
+    complex ( kind = 8 ) :: in2(n,n)
+    complex ( kind = 8 ) :: out(n)
+    complex ( kind = 8 ) :: out2(n,n)
+    complex ( kind = 8 ) :: X(n,n)
+    complex ( kind = 8 ) :: Y(n,n)
+    integer ( kind = 8 ) :: plan_backward
+    integer ( kind = 8 ) :: plan_forward
+
+    ! Method 1: double 1d-fft's
+    do j = 1,n                    ! along columns
+       in = X(:, j)
+       call dfftw_plan_dft_1d_ &
+            ( plan_forward, n, in, out, FFTW_FORWARD, FFTW_ESTIMATE)
+       call dfftw_execute_ ( plan_forward )
+        X(:, j) = out/real(n, rk)
+    end do
+    do i = 1,n                    ! then along rows
+       in = X(i, :)
+       call dfftw_plan_dft_1d_ &
+            ( plan_forward, n, in, out, FFTW_FORWARD, FFTW_ESTIMATE)
+       call dfftw_execute_ ( plan_forward )
+       Y(i, :) = out/real(n, rk)
+    end do
+    call dfftw_destroy_plan_ ( plan_forward )
+
+    ! Method 2: 2d-fft
+    in2 = X
+    call dfftw_plan_dft_2d_ ( plan_forward, n, n, in2, out2, FFTW_FORWARD, &
+         FFTW_ESTIMATE)
+    call dfftw_execute_ ( plan_forward )
+    Y = out2/real(n**2, rk)
+    call dfftw_destroy_plan_ ( plan_forward )
+#+END_SRC
+
+** Shifted FFT
+Using the approximating nature of DFT on physical data against the coefficients of Fourier expansion, we may utilize FFT routines on data obtained on half-step shifted grids on $[0, 2\pi)$.
+
+For the sake of illustration, consider the 1-D FFT situation where $X^{(s)} \in \mathbb{C}^{N}$ is a vector of point values at $2\pi(j+1/2)/N$ for $0 \le j < N$ and $Y^{(s)}$ is the result of the forward FFT on $X^{(s)}$, i.e.,
+\[
+Y^{(s)}_j = \frac{1}{N} \sum_{k=0}^{N-1} X^{(s)}_k e^{-2 \pi i j k /N} \,.
+\]
+
+By adjusting the phase of complex exponentials, we can interpret them in term of approximate Fourier coefficients of the underlying function for the $X^{(s)}$ data. Keeping in mind the aliasing errors associated with the discrete Fourier transforms, i.e., the $N$-periodicity over the index $j$, we observe that
+
+ - For $0 \le j < N/2$,
+   \[
+   Y^{(s)}_j \approx Y_j e^{- i j/N} \,,
+   \]
+ - For $N/2 < j < N$,
+   \[
+   Y^{(s)}_j \approx Y_j e^{- i (j-N)/N} \,,
+   \]
+
+The second case was considered with
+* Compiling with =gfortran=
+* Makefile
+** Editing a make file in Emacs/Org-mode
+ - When a =make= source code written in org-mode src block is tangled,
+   tabs are converted to spaces. One can manually =M-x tabify= the
+   entire file.
+ - A makefile whose file name is not =Makefile= will not be in =makefile-mode= automatically. Set the mode by =M-x makefile-mode=.
+ - In order to run a makefile with filename other than =Makefile=, use =make -f filename=.
+
+** Some idea from StackOverflow
+From [[https://stackoverflow.com/questions/8855896/specify-directory-where-gfortran-should-look-for-modules][Specify directory where gfortran should look for modules]]
+
+#+BEGIN_EXAMPLE
+  You can tell gfortran where your module files (.mod files) are located with the -I compiler flag. In addition, you can tell the compiler where to put compiled modules with the -J compiler flag. See the section "Options for directory search" in the gfortran man page.
+
+  I use these to place both my object (.o files) and my module files in the same directory, but in a different directory to all my source files, so I don't clutter up my source directory. For example,
+
+  SRC = /path/to/project/src
+  OBJ = /path/to/project/obj
+  BIN = /path/to/project/bin
+
+  gfortran -J$(OBJ) -c $(SRC)/bar.f90 -o $(OBJ)/bar.o
+  gfortran -I$(OBJ) -c $(SRC)/foo.f90 -o $(OBJ)/foo.o
+  gfortran -o $(BIN)/foo.exe $(OBJ)/foo.o $(OBJ)/bar.o
+  While the above looks like a lot of effort to type out on the command line, I generally use this idea in my makefiles.
+
+  Just for reference, the equivalent Intel fortran compiler flags are -I and -module. Essentially ifort replaces the -J option with -module. Note that there is a space after module, but not after J.
+#+END_EXAMPLE
+
+* Fortran 90 programming tips
+** Notes on precision in fortran90+
+At the beginning of program, set real precision, which is of integer type, to be
+- 4 : single
+- 8 : double
+- 16 : quadruple
+For example, declare
+#+BEGIN_SRC fortran
+  integer, parameter :: rp = 16
+#+END_SRC
+
+Then the precision of a real or complex variable can be declared by:
+#+BEGIN_SRC fortran
+  real(kind=rp) :: x
+  complex(kind=rp) :: z
+#+END_SRC
+or simply by
+#+BEGIN_SRC fortran
+  real(rp) :: x
+  complex(rp) :: z
+#+END_SRC
+
+In the body of program, the precision of a floating point number can be set by suffixing with the precision parameter, e.g.
+- 1.0_4 : single, same as 1.0
+- 1.0_8 : double, same as 1.d0
+- 1.0_16 : quadruple
+Once the precision is stored in the variable, say  =rp=, one can simply write =1.0_rp=.
+
+The precision of outputs of an intrinsic function is determined by that of its input(s). This way, we can avoid using old =d=-variations, e.g., =dcos=, =dsin=, =dabs=, etc.
+
+A complex number of certain precision can be constructed using =cmplx= function with the following syntax:
+#+BEGIN_SRC fortran
+  z = cmplx( x, y, rp )
+#+END_SRC
+
+** Tip on =write= function: internal writing
+
+The following is an example of using =write= function to assimilate the functionality of =MatLab='s =sprintf=.
+
+#+BEGIN_SRC fortran :tangle scratch.f90
+  program play
+    implicit none
+    integer :: m
+    real(8) :: rho
+
+    interface
+       function genfilename(n, rho, betaopt)
+         integer, intent(in) :: n
+         real(8), intent(in) :: rho
+         integer, intent(in) :: betaopt
+       end function genfilename
+    end interface
+
+  end program play
+
+  function genfilename(n, rho, betaopt)
+    implicit none
+    ! declaring arguments
+    integer, intent(in) :: n
+    real(8), intent(in) :: rho
+    integer, intent(in) :: betaopt
+    ! output
+    character(len=28) :: genfilename
+    ! local variables
+    character(len=*), parameter :: fmt = trim('(a, i1, a, i0.2, a, i0.4, a)')
+    integer :: log2n
+    log2n = int(log(real(n))/log(real(2)))
+    write( genfilename, fmt ) &
+         '../data/vp_b', betaopt, '_n', log2n, '_r', int(1000*rho), '.dat'
+  end function genfilename
+#+END_SRC
+
+#+RESULTS:
+: ./data/vp_b0_n05_r0123.dat
+
+** =linspaceh= function:
+The function =linspaceh(a, b, h)= constructs a vector of uniformly spaced-out points between =a= and =b= with gap =h=. In case =b-a= is not a (numerical) multiple of =h=, then the gap between =b= and the one before will be smaller than =h=. This function is included in [[file:~/Google%20Drive/VP_fortran/src/mymod.f90][mymod.f90]].
+
+#+BEGIN_SRC fortran :results value verbatim
+  program main
+    implicit none
+    real(8) :: rho0
+    real(8) :: rho1
+    real(8) :: drho
+    real(8), dimension(:), allocatable :: rhodpt
+    integer :: i
+
+    interface
+       function linspaceh(a, b, h)
+         real(8), intent(in) :: a, b, h
+         real(8), dimension(:), allocatable :: linspaceh
+       end function linspaceh
+    end interface
+    rho0 = 0.1D0
+    rho1 = 0.53D0
+    drho = 0.05D0
+    rhodpt = linspaceh(rho0, rho1, drho)
+    do i = 1, size(rhodpt)
+       write(*, '(i3, 2x, f6.4)') i, rhodpt(i)
+    end do
+    print *, rhodpt, "hello world"
+    deallocate (rhodpt)
+  end program main
+
+  function linspaceh(a, b, h)
+    implicit none
+    real(8), intent(in) :: a, b, h
+    real(8), parameter :: eps = epsilon(1.d0)
+    integer :: i, n
+    real(8), dimension(:), allocatable :: linspaceh
+    n = int((b-a)/h)
+    ! if (abs((b-a)/h-n)<eps) then  -----------> it doesn't work
+    ! if ( abs( (b-a)-n*h ) < eps ) then ------> this works
+    if ( abs(mod(b-a, h)) < eps ) then ! note we compare against the
+       ! machine epsilo n
+       allocate(linspaceh(n+1))
+       linspaceh = (/ (a + h*i, i=0,n) /)
+    else
+       allocate(linspaceh(n+2))
+       linspaceh = (/ (a+h*i, i=0,n), b /) ! note how a vector and a
+                                           ! number are concatenated
+    end if
+  end function linspaceh
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+1  0.1000
+ 2  0.1500
+ 3  0.2000
+ 4  0.2500
+ 5  0.3000
+ 6  0.3500
+ 7  0.4000
+ 8  0.4500
+ 9  0.5000
+10  0.5300
+ 0.10000000000000001       0.15000000000000002       0.20000000000000001       0.25000000000000000       0.30000000000000004       0.34999999999999998       0.40000000000000002       0.45000000000000007       0.50000000000000000       0.53000000000000003      hello world
+#+end_example
+
+** I/O formatting
+*** =print=
+Printing out to terminal: =print format_specifier, i/o_list=,
+e.g. =print *, 'hello world'=
+*** =write=
+#+BEGIN_SRC fortran :results verbatim
+    implicit none
+    real(8) :: pi = acos(-1.0d0)
+    integer :: n = 256
+    integer :: i
+    write(*, '( i30   )') n          ! integer
+    write(*, *) pi                   ! free format
+    write(*, '( f30.16)') pi         ! decimal
+    write(*, '( g30.16)') pi         ! whichever is nice
+    write(*, '( e30.16)') pi         ! exponential notation
+    write(*, '(es30.16)') pi         ! scientific notation
+    write(*, '(en30.16)') pi         ! engineering notation
+    write(*, '( e30.16E3)') pi       ! exponential notation, more spaces for exponents
+    write(*, '(2e30.16)') pi, 2*pi   ! concatenation of two
+    write(*, '(*(f7.2))') (/ (i*pi, i=1,5) /) ! variable number of outputs
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+256
+3.1415926535897931
+         3.1415926535897931
+      3.141592653589793
+     0.3141592653589793E+01
+     3.1415926535897931E+00
+     3.1415926535897931E+00
+    0.3141592653589793E+001
+     0.3141592653589793E+01        0.6283185307179586E+01
+3.14   6.28   9.42  12.57  15.71
+#+end_example
+
+** Arrays - basics
+ - In Fortran 90+, one can construct arrays with inline do-loops, a.k.a., implied do-loops. For example,
+   #+BEGIN_SRC fortran
+       v = (/ (i, i=1,10) /)
+       w = [ (j, j=1,100,2) ]
+   #+END_SRC
+
+ - Of course, =i= and =j= need to be declared integers and =v= and =w=
+   as integer/real/complex arrays of appropriate dimensions. Note
+   below how types are cast:
+   #+BEGIN_SRC fortran :tangle arrays.f90
+     program arrays
+       implicit none
+       integer, parameter :: m=2, n=5
+       integer :: i
+       integer :: v_int(n), inner, outer(n,n)
+       real :: v_real(n), a(m,n), a1(m,n), b(n,m), b1(n,m), c(m,m), d(n,n)
+       complex :: v_cmplx(n)
+
+       ! constructing vectors using inline do-loops
+       v_int = [ (i, i = 1,n) ]
+       v_real = [ (i, i = 1,n) ]
+       v_cmplx = [ (cmplx(i, sqrt(real(i))), i = 1,n) ]
+
+       ! type-casting
+       do i = 1,n
+          print *, v_int(i), v_real(i), v_cmplx(i)
+       end do
+
+       ! 2-D array using do-loop
+       do i = 1,n
+          a(1:m,i) = (/ i, i+1 /)
+       end do
+
+       ! 2-D array using reshape and implied do-loop
+       a1 = reshape( [(i, i=1,m*n)], [m,n] )
+
+       ! transpose
+       b = transpose(a)
+
+       ! reshaping
+       b1 = reshape( a1, [n,m] )
+
+       ! scalar multiplication, inner product, outer product
+       v_int = 2*v_int               ! scalar multiplication
+       inner = dot_product(v_int, v_int) ! inner product
+       outer = spread(v_int, 2, n)*spread(v_int, 1, n)
+       ! spread behaves like MatLab's repmat function
+
+       print *, ''
+       do i = 1,n
+          print *, v_int(i)
+       end do
+     end program arrays
+   #+END_SRC
+
+ - =size= and =shape=
+   #+BEGIN_SRC fortran
+       implicit none
+       integer :: a(3,5), i
+       a = reshape( (/(i, i=1,15)/), (/3,5/) )
+       print *, size(a)
+       print *, size(a, 1)
+       print *, size(a, 2)
+   #+END_SRC
+
+   #+RESULTS:
+   | 15 |
+   |  3 |
+   |  5 |
+
+** Arrays - assignment
+Many functions on arrays behave similarly to those of =MatLa=.
+
+#+BEGIN_SRC fortran :results verbatim
+  implicit none
+  integer, parameter :: n = 5
+  integer, parameter :: rk = 8
+  integer :: i
+  real(rk) :: v(n), w(n), A(n,n)
+
+  A = 0.0_rk                    ! creating zero matrix
+  write(*, '(a)') 'Creating zero matrix'
+  write(*, '(a/)') 'A = 0.0_rk  yields '
+  write(*, '(5f8.4)') A
+
+  v = (/ (i, i=1,n) /)
+  w = (/ (i, i=n,1,-1) /)
+  write(*, '(/a)') 'Defining vectors'
+  write(*, '(5f8.4)') v
+  write(*, '(5f8.4)') w
+
+  write(*, '(/a)') 'Assigning columns of A:'
+  do i = 1,n
+     A(:,i) = v**i
+  end do
+  do i = 1,n
+     write(*, '(5g12.4)') A(i, :)
+  end do
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+Creating zero matrix
+A = 0.0_rk  yields
+
+  0.0000  0.0000  0.0000  0.0000  0.0000
+  0.0000  0.0000  0.0000  0.0000  0.0000
+  0.0000  0.0000  0.0000  0.0000  0.0000
+  0.0000  0.0000  0.0000  0.0000  0.0000
+  0.0000  0.0000  0.0000  0.0000  0.0000
+
+Defining vectors
+  1.0000  2.0000  3.0000  4.0000  5.0000
+  5.0000  4.0000  3.0000  2.0000  1.0000
+
+Assigning columns of A:
+   1.000       1.000       1.000       1.000       1.000
+   2.000       4.000       8.000       16.00       32.00
+   3.000       9.000       27.00       81.00       243.0
+   4.000       16.00       64.00       256.0       1024.
+   5.000       25.00       125.0       625.0       3125.
+#+end_example
+
+** Arrays: =transpose= and =spread=
+#+BEGIN_SRC fortran :results verbatim
+  implicit none
+  integer, parameter :: n = 5
+  integer, parameter :: rk = 8
+  integer :: i
+  real(rk) :: v(n), w(n), A(n,n), B(n,n)
+
+  v = (/ (i, i=1,n) /)
+  w = (/ (i, i=n,1,-1) /)
+  write(*, '(/a)') 'Defining vectors'
+  write(*, '(5f8.4)') v
+  write(*, '(5f8.4)') w
+
+  write(*, '(/a)') 'spread: equivalent of repmat in matlab'
+  write(*, '(a)') '   syntax: spread( array, dim, ncopies )'
+  A = spread(v, 1, n)
+  B = spread(v, 2, n)
+
+  write(*, '(/a)') '  A = '
+  do i = 1,n
+     write(*, '(5g12.4)') A(i, :)
+  end do
+
+  write(*, '(/a)') '  B = '
+  do i = 1,n
+     write(*, '(5g12.4)') B(i, :)
+  end do
+
+  B = transpose(A)
+  write(*, '(/a)') 'Transpose of a matrix'
+  write(*, '(a)') '    syntax: transpose( array )'
+  write(*, '(/a)') '  A transpoe = '
+  do i = 1,n
+     write(*, '(5g12.4)') B(i, :)
+  end do
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+Defining vectors
+  1.0000  2.0000  3.0000  4.0000  5.0000
+  5.0000  4.0000  3.0000  2.0000  1.0000
+
+spread: equivalent of repmat in matlab
+   syntax: spread( array, dim, ncopies )
+
+  A =
+   1.000       2.000       3.000       4.000       5.000
+   1.000       2.000       3.000       4.000       5.000
+   1.000       2.000       3.000       4.000       5.000
+   1.000       2.000       3.000       4.000       5.000
+   1.000       2.000       3.000       4.000       5.000
+
+  B =
+   1.000       1.000       1.000       1.000       1.000
+   2.000       2.000       2.000       2.000       2.000
+   3.000       3.000       3.000       3.000       3.000
+   4.000       4.000       4.000       4.000       4.000
+   5.000       5.000       5.000       5.000       5.000
+
+Transpose of a matrix
+    syntax: transpose( array )
+
+  A transpoe =
+   1.000       1.000       1.000       1.000       1.000
+   2.000       2.000       2.000       2.000       2.000
+   3.000       3.000       3.000       3.000       3.000
+   4.000       4.000       4.000       4.000       4.000
+   5.000       5.000       5.000       5.000       5.000
+#+end_example
+
+** Arrays: general concatenation using =reshape=
+#+BEGIN_SRC fortran :results verbatim
+  implicit none
+  integer, parameter :: n = 5
+  integer, parameter :: rk = 8
+  integer :: i
+  real(rk) :: v(n), w(n), A(n,n), B(n,n), C(2*n,n), D(n,2*n)
+
+  v = (/ (i, i=1,n) /)
+  w = (/ (i, i=n,1,-1) /)
+
+  A =  reshape((/ (v**i, i=1,n) /), [n,n])
+  write(*, '(/a)') 'Concatenation using reshape function'
+  do i = 1,n
+     write(*, '(5g12.4)') A(i, :)
+  end do
+
+  B =  transpose(reshape((/ (v**i, i=1,n) /), [n,n]))
+  write(*, '(/a)') 'Concatenation using reshape function'
+  do i = 1,n
+     write(*, '(5g12.4)') B(i, :)
+  end do
+
+  C(1:n, :) = A
+  C(n+1:2*n, :) = B(n:1:-1, :)
+  write(*, '(/a)') 'Concatenating two matrices'
+  do i = 1,2*n
+     write(*, '(5g12.4)') C(i, :)
+  end do
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+Concatenation using reshape function
+   1.000       1.000       1.000       1.000       1.000
+   2.000       4.000       8.000       16.00       32.00
+   3.000       9.000       27.00       81.00       243.0
+   4.000       16.00       64.00       256.0       1024.
+   5.000       25.00       125.0       625.0       3125.
+
+Concatenation using reshape function
+   1.000       2.000       3.000       4.000       5.000
+   1.000       4.000       9.000       16.00       25.00
+   1.000       8.000       27.00       64.00       125.0
+   1.000       16.00       81.00       256.0       625.0
+   1.000       32.00       243.0       1024.       3125.
+
+Concatenating two matrices
+   1.000       1.000       1.000       1.000       1.000
+   2.000       4.000       8.000       16.00       32.00
+   3.000       9.000       27.00       81.00       243.0
+   4.000       16.00       64.00       256.0       1024.
+   5.000       25.00       125.0       625.0       3125.
+   1.000       32.00       243.0       1024.       3125.
+   1.000       16.00       81.00       256.0       625.0
+   1.000       8.000       27.00       64.00       125.0
+   1.000       4.000       9.000       16.00       25.00
+   1.000       2.000       3.000       4.000       5.000
+#+end_example
+
+** Arrays: trick to calculate maximal value of an array using =reshape=
+#+BEGIN_SRC fortran :results verbatim
+  implicit none
+  real(8) :: a(3,3)
+
+  a(1,1) = 1.0D+00
+  a(1,2) = 2.0D+00
+  a(1,3) = 3.0D+00
+
+  a(2,1) = 4.0D+00
+  a(2,2) = 5.0D+00
+  a(2,3) = 6.0D+00
+
+  a(3,1) = 7.0D+00
+  a(3,2) = 8.0D+00
+  a(3,3) = 0.0D+00
+
+  print *, maxval( reshape(a, [size(a)]) ) ! turn a into a vector
+  ! the 2nd arg of reshape should be an array of rank 1
+#+END_SRC
+
+#+RESULTS:
+: 8.0
+
+** Arrays: indexation
+#+BEGIN_SRC fortran
+    implicit none
+    integer :: a(5,5), i
+    a = reshape( (/(i, i=1,25)/), (/5,5/) )
+    write(*, '(i5)') a
+    do i = 1,5
+       write(*, '(*(i5))') a(i,:)
+    end do
+#+END_SRC
+
+#+RESULTS:
+|  1 |    |    |    |    |
+|  2 |    |    |    |    |
+|  3 |    |    |    |    |
+|  4 |    |    |    |    |
+|  5 |    |    |    |    |
+|  6 |    |    |    |    |
+|  7 |    |    |    |    |
+|  8 |    |    |    |    |
+|  9 |    |    |    |    |
+| 10 |    |    |    |    |
+| 11 |    |    |    |    |
+| 12 |    |    |    |    |
+| 13 |    |    |    |    |
+| 14 |    |    |    |    |
+| 15 |    |    |    |    |
+| 16 |    |    |    |    |
+| 17 |    |    |    |    |
+| 18 |    |    |    |    |
+| 19 |    |    |    |    |
+| 20 |    |    |    |    |
+| 21 |    |    |    |    |
+| 22 |    |    |    |    |
+| 23 |    |    |    |    |
+| 24 |    |    |    |    |
+| 25 |    |    |    |    |
+|  1 |  6 | 11 | 16 | 21 |
+|  2 |  7 | 12 | 17 | 22 |
+|  3 |  8 | 13 | 18 | 23 |
+|  4 |  9 | 14 | 19 | 24 |
+|  5 | 10 | 15 | 20 | 25 |
+
+** Arrays: =lbound= and =ubound=
+#+BEGIN_SRC fortran
+    implicit none
+    integer :: v(1:10), w(-5:4)
+    print *, lbound(v), ubound(v)
+    print *, lbound(w), ubound(w)
+#+END_SRC
+
+#+RESULTS:
+|  1 | 10 |
+| -5 |  4 |
+
+** Characters
+*** Example
+#+BEGIN_SRC fortran
+  program character
+    implicit none
+    character(len=30) :: fname
+
+    fname = 'mydata.dat'
+    print *, fname
+    stop
+  end program character
+#+END_SRC
+
+#+RESULTS:
+: mydata.dat
+*** Notes
+ - Use =character(len=*)= when the length of a character string is not known.
+** Important notes on =interface=
+When one intends to input an array of arbitrary size into a routine, the /assumed shape/ technique turns out to be quite advantageous. Consider the following sample program:
+
+#+BEGIN_SRC fortran
+  program dummy_array
+    implicit none
+    integer, dimension(10) :: a
+    interface ! This interface block is necessary
+       subroutine fill_array(a)
+         integer, dimension(:), intent(out) :: a
+       end subroutine fill_array
+    end interface
+    call fill_array(a)
+    write(*, '(i4)') a
+  end program dummy_array
+
+  subroutine fill_array(a)
+    implicit none
+    ! argument declaration
+    integer, dimension(:), intent(out) :: a
+    ! local variable
+    integer :: i, size_a
+    size_a = size(a)
+    do i = 1,size_a
+       a(i) = i
+    end do
+  end subroutine fill_array
+#+END_SRC
+
+#+RESULTS:
+|  1 |
+|  2 |
+|  3 |
+|  4 |
+|  5 |
+|  6 |
+|  7 |
+|  8 |
+|  9 |
+| 10 |
+
+Note that the =interface= block is required. In the block, only the arguments to the routines need be type-cast.
+
+In order to avoid writing such blocks over and over, utilize a module structure as follows:
+#+BEGIN_SRC fortran
+  module mod
+  contains
+    subroutine fill_array(a)
+      implicit none
+      ! argument declaration
+      integer, dimension(:), intent(out) :: a
+      ! local variable
+      integer :: i, size_a
+      size_a = size(a)
+      do i = 1,size_a
+         a(i) = i
+      end do
+    end subroutine fill_array
+  end module mod
+
+  program dummy_array
+    use mod
+    implicit none
+    integer, dimension(10) :: a
+    call fill_array(a)
+    write(*, '(i4)') a
+  end program dummy_array
+#+END_SRC
+
+#+RESULTS:
+|  1 |
+|  2 |
+|  3 |
+|  4 |
+|  5 |
+|  6 |
+|  7 |
+|  8 |
+|  9 |
+| 10 |
+
+** fftshift
+#+BEGIN_SRC fortran :results verbatim
+  implicit none
+  integer, parameter :: n = 4
+  integer, parameter :: n2 = 2*n
+  integer, parameter :: nm1 = n-1
+  integer, parameter :: n2m1 = n2-1
+  integer :: i, j
+  integer :: ind(n2)
+  real, dimension(n2) :: a
+  ! real, dimension(-n:nm1) :: a1
+  real, allocatable :: a1(:)
+  real, dimension(n2, n2) :: m
+  real, dimension(-n:nm1, -n:nm1) :: m1
+  a = (/ (i, i=0,n2m1) /)
+  ind = (/ (i, i=n+1,n2), (i, i=1,n) /)
+  write(*, '(a/ *(i7))') 'fftshift index:', ind
+  ! a1(-n:-1) = a(n+1:n2)
+  ! a1(0:nm1) = a(1:n)
+  allocate(a1(-n:nm1))
+  a1 = a(ind)
+  write(*, '(/a/ *(f7.2))') 'original vector:', a
+  write(*, '(/a/ *(f7.2))') 'post-fftshift:', a1
+
+  m(1:n, n+1:n2) = 1.0
+  m(1:n, 1:n) = 2.0
+  m(n+1:n2, 1:n) = 3.0
+  m(n+1:n2, n+1:n2) = 4.0
+  write(*, '(/a)') 'original matrix:'
+  do i = 1,n2
+     write(*, '(*(f7.1))') m(i,:)
+  end do
+
+  ! m = m(:,ind)
+  ! m1 = m(ind,:)
+  ! The single line below is equivalent to the two lines above.
+  m1 = m(ind,ind)
+  write(*, '(/a)') 'post-fftshift:'
+  do i = -n,nm1
+     write(*, '(*(f7.1))') m1(i,:)
+  end do
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+fftshift index:
+      5      6      7      8      1      2      3      4
+
+original vector:
+   0.00   1.00   2.00   3.00   4.00   5.00   6.00   7.00
+
+post-fftshift:
+   4.00   5.00   6.00   7.00   0.00   1.00   2.00   3.00
+
+original matrix:
+    2.0    2.0    2.0    2.0    1.0    1.0    1.0    1.0
+    2.0    2.0    2.0    2.0    1.0    1.0    1.0    1.0
+    2.0    2.0    2.0    2.0    1.0    1.0    1.0    1.0
+    2.0    2.0    2.0    2.0    1.0    1.0    1.0    1.0
+    3.0    3.0    3.0    3.0    4.0    4.0    4.0    4.0
+    3.0    3.0    3.0    3.0    4.0    4.0    4.0    4.0
+    3.0    3.0    3.0    3.0    4.0    4.0    4.0    4.0
+    3.0    3.0    3.0    3.0    4.0    4.0    4.0    4.0
+
+post-fftshift:
+    4.0    4.0    4.0    4.0    3.0    3.0    3.0    3.0
+    4.0    4.0    4.0    4.0    3.0    3.0    3.0    3.0
+    4.0    4.0    4.0    4.0    3.0    3.0    3.0    3.0
+    4.0    4.0    4.0    4.0    3.0    3.0    3.0    3.0
+    1.0    1.0    1.0    1.0    2.0    2.0    2.0    2.0
+    1.0    1.0    1.0    1.0    2.0    2.0    2.0    2.0
+    1.0    1.0    1.0    1.0    2.0    2.0    2.0    2.0
+    1.0    1.0    1.0    1.0    2.0    2.0    2.0    2.0
+#+end_example
+
+* Testing area
+#+BEGIN_SRC fortran :results verbatim
+    implicit none
+    ! argument declaration
+    integer, parameter :: n = 512
+    integer, parameter :: rk = 8
+    integer :: i, j, k
+    real(8) :: rho = 0.5d0
+    real(8) :: beta = 0.d0
+    real(8) :: pi = 4.d0*atan(1.d0)
+    real(8) :: M(n,n)
+    real(8) :: nu(n)
+    complex(8) :: eta(n), zeta(n), etah(n), integ(n,n), etahm(n,n)
+
+    nu = (/ (2*pi*i/n, i=0,n-1) /)
+    eta = exp( cmplx(0.0, 1.0, kind=8) * nu )
+    zeta = (eta-beta)/(1.0_rk-beta*eta)
+    etah = (rho**2/zeta+beta)/(1.0_rk+beta*(rho**2/zeta))
+    ! write (*, '(2es25.10)') etah
+
+    integ = cmplx(spread(eta, 1, n) ** spread((/ (k-1, k=1,n) /), 2, n), kind=rk)
+    etahM = spread(etah, 1, n)
+    do j = 1,n
+       integ = cmplx(integ*etahM, kind=rk)
+       M(:,j) = 1/real(n, rk)*real(sum(integ, 2), rk)
+    end do
+    do i = 1,1
+       do j = n-4,n
+          ! write(*, '(2x, i4, 2x, i4, 2x, es16.5e3)') i, j, M(i,j)
+          write(*, '(2x, i4, 2x, i4, 2x, e16.5E3)') i, j, M(i,j)
+       end do
+    end do
+#+END_SRC
+
+#+RESULTS:
+: 1   508      0.10711E-319
+: 1   509      0.18824E-320
+: 1   510      0.63240E-321
+: 1   511      0.44960E-321
+: 1   512      0.55627E-308
+
+#+BEGIN_SRC fortran :results verbatim
+  implicit none
+  real(8) :: a(3,3), b(3)
+  integer :: i, ind(3)
+
+  a(1,1) = 1.0D+00
+  a(1,2) = 2.0D+00
+  a(1,3) = 3.0D+00
+
+  a(2,1) = 4.0D+00
+  a(2,2) = 5.0D+00
+  a(2,3) = 6.0D+00
+
+  a(3,1) = 7.0D+00
+  a(3,2) = 8.0D+00
+  a(3,3) = 0.0D+00
+
+  b = (/ 1.d0, 2.d0, 3.d0 /)
+  ind = (/ 1, 2, 3 /)
+
+  print *, size(a)
+  print *, reshape(a, (/9/))
+  print *, sum( a(1,ind)*b )
+  print *, matmul( a(1:2,ind), b )
+#+END_SRC
+
+#+RESULTS:
+: 9
+: 1.0000000000000000        4.0000000000000000        7.0000000000000000        2.0000000000000000        5.0000000000000000        8.0000000000000000        3.0000000000000000        6.0000000000000000        0.0000000000000000
+: 14.000000000000000
+: 14.000000000000000        32.000000000000000
+
+*Signum function*
+#+BEGIN_SRC fortran
+  program test_sign
+    implicit none
+    real(8) :: sgn
+
+    print *, sgn(3)
+    print *, sgn(0)
+    print *, sgn(-3)
+  end program test_sign
+
+  function sgn(n)
+    implicit none
+    integer :: n
+    real(8) :: sgn
+    if (n > 0) then
+       sgn = 1.d0
+    else if (n == 0) then
+       sgn = 0.d0
+    else
+       sgn = -1.d0
+    end if
+  end function sgn
+#+END_SRC
+
+#+RESULTS:
+|  1.0 |
+|  0.0 |
+| -1.0 |
+
+*integer kind*
+#+BEGIN_SRC fortran
+  print *, (/ (i, i=1, 5) /)
+#+END_SRC
+
+#+RESULTS:
+: 1           2           3           4           5

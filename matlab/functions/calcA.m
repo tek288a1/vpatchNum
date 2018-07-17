@@ -1,0 +1,27 @@
+function A = calcA(n, rho, beta, a)
+  n4 = 4*n;
+  n2 = 2*n;
+  npt = n4;
+  i_rng = (1:n/2);
+  nj = 100;
+  u = a(1);
+  nu = linspace(0, 2*pi, npt+1)';
+  nu(end) = [];
+  eta = exp(1i*nu);
+  [z, zd, zeta, dthdnu] = ptval(rho, beta, a, eta);
+  M = trmatval(n, rho, beta);
+  jt = jtval(nj, rho, zeta);
+  [A0, q0] = a0valnew(z, zd, u);
+  c0 = c0val(A0, zd);
+  omega0 = q0 .* dthdnu .* (c0 - u*jt);
+  Lu = q0 .* (omega0 + jt.*dthdnu);
+  [J1, A1] = j1val(eta, z, zd, omega0);
+  [J2, A2] = j2val(eta, z, zd, omega0);
+  [J3, A3] = j3val(eta, z, zd, omega0);
+  [H4, B4] = h4val(z, zd);
+  T_hat = thval(A1, A2, A3);              % time consuming
+  T1 = t1val(T_hat, B4, dthdnu);
+  A1jm = A1jmval(q0, T1, M);              % time consuming
+  Ajm = Ajmval(q0, T1, M, Lu);            % time consuming
+  A = real( Ajm(i_rng, i_rng) );
+end

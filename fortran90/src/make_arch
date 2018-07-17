@@ -1,0 +1,6 @@
+execute:
+	@gfortran -O3 -o main.exe mymod.f90 main.f90 routines.f90 -llapack
+	@./main.exe
+
+clean:
+	@rm -f *.o
